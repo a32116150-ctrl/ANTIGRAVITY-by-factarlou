@@ -1,0 +1,17 @@
+# Antigravity POS Config
+arm_64bit=1
+disable_splash=1
+dtoverlay=vc4-kms-v3d
+max_framebuffers=2
+gpu_mem=128
+
+# Fast Boot
+boot_delay=0
+force_turbo=1
+
+# Display (1080p)
+hdmi_group=1
+hdmi_mode=16
+
+# USB Support
+dtoverlay=dwc2
