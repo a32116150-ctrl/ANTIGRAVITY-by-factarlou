@@ -1,0 +1,64 @@
+name: Build and Release Antigravity POS
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Buildroot Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential bash bc binutils bzip2 ca-certificates \
+            cpio file g++ gcc git gzip libncurses5-dev libssl-dev \
+            make patch perl python3 rsync sed tar unzip wget
+
+      - name: Clone Buildroot
+        run: |
+          git clone -b 2023.11.x --depth 1 https://git.buildroot.net/buildroot buildroot_src
+
+      - name: Setup Buildroot Configuration
+        run: |
+          # Copy board files and configs into the buildroot source tree
+          cp -r buildroot/board buildroot_src/
+          cp buildroot/configs/antigravity_defconfig buildroot_src/configs/
+          
+          # The post-build script in the defconfig expects to find app/ ui/ etc in ..
+          # In this setup, buildroot_src is in the project root, so .. is the project root.
+          # This matches the cp -r ../app logic in post-build.sh
+
+      - name: Build Antigravity OS
+        working-directory: buildroot_src
+        run: |
+          make antigravity_defconfig
+          # Using -j$(nproc) to speed up compilation
+          make -j$(nproc)
+
+      - name: Prepare Release Asset
+        run: |
+          mkdir -p release_assets
+          cp buildroot_src/output/images/sdcard.img release_assets/antigravity_pos_rpi_zero_2_w.img
+          cd release_assets
+          zip antigravity_pos_v1_release.zip antigravity_pos_rpi_zero_2_w.img
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release_assets/antigravity_pos_v1_release.zip
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
