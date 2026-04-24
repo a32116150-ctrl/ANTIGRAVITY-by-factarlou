@@ -18,8 +18,8 @@ Rectangle {
             spacing: NeonStyle.spaceM
             ColumnLayout {
                 spacing: 2
-                Text { text: "STOCK MANAGEMENT"; color: NeonStyle.textColor; font.pixelSize: NeonStyle.fontHeader; font.bold: true }
-                Text { text: "Monitor and manage your product inventory levels"; color: NeonStyle.textSecondaryColor; font.pixelSize: NeonStyle.fontBody }
+                Text { text: "STOCK MANAGEMENT"; color: NeonStyle.textColor; font.pixelSize: 24; font.bold: true }
+                Text { text: "Monitor and manage your product inventory levels"; color: NeonStyle.textSecondaryColor; font.pixelSize: 14 }
             }
             Item { Layout.fillWidth: true }
             NeonTextField {
@@ -51,15 +51,15 @@ Rectangle {
                 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: NeonStyle.spaceM + 12 // Match Card internal layout
+                    anchors.leftMargin: NeonStyle.spaceM + 12
                     anchors.rightMargin: NeonStyle.spaceM + 12
                     spacing: 20
                     
-                    Text { text: "BARCODE"; color: NeonStyle.textMuted; font.bold: true; font.pixelSize: NeonStyle.fontCaption; Layout.preferredWidth: 120 }
-                    Text { text: "PRODUCT NAME"; color: NeonStyle.textMuted; font.bold: true; font.pixelSize: NeonStyle.fontCaption; Layout.fillWidth: true }
-                    Text { text: "STOCK"; color: NeonStyle.textMuted; font.bold: true; font.pixelSize: NeonStyle.fontCaption; Layout.preferredWidth: 80; horizontalAlignment: Text.AlignHCenter }
-                    Text { text: "UNIT PRICE"; color: NeonStyle.textMuted; font.bold: true; font.pixelSize: NeonStyle.fontCaption; Layout.preferredWidth: 100; horizontalAlignment: Text.AlignRight }
-                    Text { text: "ACTIONS"; color: NeonStyle.textMuted; font.bold: true; font.pixelSize: NeonStyle.fontCaption; Layout.preferredWidth: 100; horizontalAlignment: Text.AlignRight }
+                    Text { text: "BARCODE"; color: NeonStyle.textMuted; font.bold: true; font.pixelSize: 12; Layout.preferredWidth: 120 }
+                    Text { text: "PRODUCT NAME"; color: NeonStyle.textMuted; font.bold: true; font.pixelSize: 12; Layout.fillWidth: true }
+                    Text { text: "STOCK"; color: NeonStyle.textMuted; font.bold: true; font.pixelSize: 12; Layout.preferredWidth: 80; horizontalAlignment: Text.AlignHCenter }
+                    Text { text: "UNIT PRICE"; color: NeonStyle.textMuted; font.bold: true; font.pixelSize: 12; Layout.preferredWidth: 100; horizontalAlignment: Text.AlignRight }
+                    Text { text: "ACTIONS"; color: NeonStyle.textMuted; font.bold: true; font.pixelSize: 12; Layout.preferredWidth: 100; horizontalAlignment: Text.AlignRight }
                 }
             }
 
@@ -78,6 +78,7 @@ Rectangle {
                     width: invList.width
                     height: 56
                     padding: 0
+                    hasShadow: false
                     
                     RowLayout {
                         anchors.fill: parent
@@ -88,14 +89,14 @@ Rectangle {
                         Text {
                             text: modelData.barcode || "---"
                             color: NeonStyle.textSecondaryColor
-                            font.pixelSize: NeonStyle.fontBody
+                            font.pixelSize: 14
                             Layout.preferredWidth: 120
                         }
                         
                         Text {
                             text: modelData.name
                             color: NeonStyle.textColor
-                            font.pixelSize: NeonStyle.fontSubTitle
+                            font.pixelSize: 16
                             font.bold: true
                             Layout.fillWidth: true
                             elide: Text.ElideRight
@@ -104,23 +105,23 @@ Rectangle {
                         Rectangle {
                             Layout.preferredWidth: 80
                             Layout.preferredHeight: 26
-                            radius: NeonStyle.radiusS
-                            color: modelData.stock <= 5 ? NeonStyle.errorColor + "15" : NeonStyle.successColor + "15"
+                            radius: 13
+                            color: modelData.stock <= 5 ? NeonStyle.errorColor + "15" : NeonStyle.greenColor + "15"
                             Layout.alignment: Qt.AlignVCenter
                             
                             Text {
                                 anchors.centerIn: parent
                                 text: modelData.stock
-                                color: modelData.stock <= 5 ? NeonStyle.errorColor : NeonStyle.successColor
+                                color: modelData.stock <= 5 ? NeonStyle.errorColor : NeonStyle.greenColor
                                 font.bold: true
-                                font.pixelSize: NeonStyle.fontBody
+                                font.pixelSize: 14
                             }
                         }
 
                         Text {
                             text: Number(modelData.price).toFixed(3)
-                            color: NeonStyle.cyanColor
-                            font.pixelSize: NeonStyle.fontSubTitle
+                            color: NeonStyle.primaryColor
+                            font.pixelSize: 16
                             font.bold: true
                             Layout.preferredWidth: 100
                             horizontalAlignment: Text.AlignRight
@@ -173,8 +174,8 @@ Rectangle {
         anchors.centerIn: parent
         width: 400
         modal: true
-        background: NeonCard { glowColor: NeonStyle.greenGlow }
-        header: Text { text: "NEW PRODUCT"; color: NeonStyle.greenColor; font.bold: true; horizontalAlignment: Text.AlignHCenter; padding: 20 }
+        background: NeonCard { hasShadow: true }
+        header: Text { text: "NEW PRODUCT"; color: NeonStyle.textColor; font.bold: true; horizontalAlignment: Text.AlignHCenter; padding: 20 }
         
         ColumnLayout {
             anchors.fill: parent
@@ -189,7 +190,7 @@ Rectangle {
                 Layout.alignment: Qt.AlignRight
                 NeonButton { text: "CANCEL"; primary: false; onClicked: addDialog.close() }
                 NeonButton { 
-                    text: "ADD"; mainColor: NeonStyle.greenColor
+                    text: "ADD"; mainColor: NeonStyle.primaryColor
                     onClicked: {
                         if (posBackend) posBackend.addProduct(nameField.text, barcodeField.text, parseFloat(priceField.text), parseInt(stockField.text), 1)
                         addDialog.close()
@@ -204,8 +205,8 @@ Rectangle {
         anchors.centerIn: parent
         width: 400
         modal: true
-        background: NeonCard { glowColor: NeonStyle.cyanGlow }
-        header: Text { text: "EDIT PRODUCT"; color: NeonStyle.cyanColor; font.bold: true; horizontalAlignment: Text.AlignHCenter; padding: 20 }
+        background: NeonCard { hasShadow: true }
+        header: Text { text: "EDIT PRODUCT"; color: NeonStyle.textColor; font.bold: true; horizontalAlignment: Text.AlignHCenter; padding: 20 }
         Text { id: editId; visible: false }
 
         ColumnLayout {
@@ -221,10 +222,10 @@ Rectangle {
                 Layout.alignment: Qt.AlignRight
                 NeonButton { text: "CANCEL"; primary: false; onClicked: editDialog.close() }
                 NeonButton { 
-                    text: "UPDATE"; mainColor: NeonStyle.cyanColor
+                    text: "UPDATE"; mainColor: NeonStyle.primaryColor
                     onClicked: {
                         if (posBackend) posBackend.updateProduct(parseInt(editId.text), editName.text, editBarcode.text, parseFloat(editPrice.text), parseInt(editStock.text), 1)
-                        editDialog.open()
+                        editDialog.close()
                     }
                 }
             }

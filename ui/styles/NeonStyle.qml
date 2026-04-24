@@ -2,53 +2,47 @@ pragma Singleton
 import QtQuick 6.0
 
 QtObject {
-    // Background colors - Deep professional dark theme
-    readonly property string backgroundColor: "#0F111A"
-    readonly property string surfaceColor: "#161925"
-    readonly property string surfaceLightColor: "#1F2335"
-    readonly property string surfaceElevated: "#24293E"
-    readonly property string surfacePressed: "#2D334D"
+    // Background colors - Clean Modern Light Theme
+    readonly property string backgroundColor: "#F8F9FB"
+    readonly property string surfaceColor: "#FFFFFF"
+    readonly property string surfaceLightColor: "#F1F5F9"
+    readonly property string surfaceElevated: "#FFFFFF"
+    readonly property string surfacePressed: "#E2E8F0"
 
-    // Refined Neon accents (softer, more professional)
-    readonly property string cyanColor: "#00E5FF"
-    readonly property string cyanDarkColor: "#00B8CC"
-    readonly property string cyanGlow: "#00E5FF22"
+    // Primary Accents (Modern Purple & Accent Dark)
+    readonly property string primaryColor: "#5A2EE5"
+    readonly property string primaryDarkColor: "#4321AB"
+    readonly property string primaryGlow: "#5A2EE515"
     
-    readonly property string magentaColor: "#FF40B3"
-    readonly property string magentaDarkColor: "#CC338F"
-    readonly property string magentaGlow: "#FF40B322"
+    readonly property string accentColor: "#0F172A"
+    readonly property string accentDarkColor: "#020617"
+    readonly property string accentGlow: "#0F172A15"
     
-    readonly property string greenColor: "#00E676"
-    readonly property string greenDarkColor: "#00B25B"
-    readonly property string greenGlow: "#00E67622"
-    
-    readonly property string goldColor: "#FFC107"
-    readonly property string goldDarkColor: "#CC9A06"
-    readonly property string goldGlow: "#FFC10722"
-
-    readonly property string purpleColor: "#7C4DFF"
-    readonly property string purpleDarkColor: "#633DCC"
-    readonly property string purpleGlow: "#7C4DFF22"
+    readonly property string cyanColor: "#0EA5E9"
+    readonly property string magentaColor: "#D946EF"
+    readonly property string greenColor: "#10B981"
+    readonly property string goldColor: "#F59E0B"
+    readonly property string purpleColor: "#8B5CF6"
 
     // Functional colors
-    readonly property string errorColor: "#FF5252"
-    readonly property string successColor: "#00E676"
-    readonly property string warningColor: "#FFD740"
-    readonly property string infoColor: "#00E5FF"
+    readonly property string errorColor: "#EF4444"
+    readonly property string successColor: "#10B981"
+    readonly property string warningColor: "#F59E0B"
+    readonly property string infoColor: "#0EA5E9"
 
-    // Text colors - High contrast and readability
-    readonly property string textColor: "#E2E8F0"
-    readonly property string textSecondaryColor: "#94A3B8"
-    readonly property string textMuted: "#64748B"
-    readonly property string textInverse: "#0F111A"
+    // Text colors - High contrast for Light Theme
+    readonly property string textColor: "#0F172A"
+    readonly property string textSecondaryColor: "#475569"
+    readonly property string textMuted: "#94A3B8"
+    readonly property string textInverse: "#FFFFFF"
 
     // Borders
-    readonly property string borderColor: "#2A2F45"
-    readonly property string borderLightColor: "#383F5C"
+    readonly property string borderColor: "#E2E8F0"
+    readonly property string borderLightColor: "#F1F5F9"
 
     // Font sizes
-    readonly property int fontHeader: 26
-    readonly property int fontTitle: 20
+    readonly property int fontHeader: 28
+    readonly property int fontTitle: 22
     readonly property int fontSubTitle: 16
     readonly property int fontBody: 14
     readonly property int fontCaption: 12
@@ -61,30 +55,20 @@ QtObject {
     readonly property int spaceL: 24
     readonly property int spaceXL: 32
 
-    // Radius
-    readonly property real radiusS: 6
-    readonly property real radiusM: 10
-    readonly property real radiusL: 14
+    // Radius (More rounded for Modern look)
+    readonly property real radiusS: 8
+    readonly property real radiusM: 12
+    readonly property real radiusL: 20
     readonly property real radiusFull: 99
 
     // Animation durations
     readonly property int animFast: 100
-    readonly property int animNormal: 200
-    readonly property int animSlow: 400
+    readonly property int animNormal: 250
+    readonly property int animSlow: 450
 
     // Gradients
-    readonly property list<variant> cyanGradient: [
-        { "position": 0.0, "color": "#00E5FF" },
-        { "position": 1.0, "color": "#00B0FF" }
-    ]
-    
-    readonly property list<variant> magentaGradient: [
-        { "position": 0.0, "color": "#FF40B3" },
+    readonly property list<variant> primaryGradient: [
+        { "position": 0.0, "color": "#5A2EE5" },
         { "position": 1.0, "color": "#7C4DFF" }
-    ]
-
-    readonly property list<variant> surfaceGradient: [
-        { "position": 0.0, "color": "#1F2335" },
-        { "position": 1.0, "color": "#161925" }
     ]
 }

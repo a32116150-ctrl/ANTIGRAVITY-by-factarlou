@@ -5,7 +5,7 @@ import "../styles"
 TextField {
     id: control
     
-    property color accentColor: NeonStyle.cyanColor
+    property color accentColor: NeonStyle.primaryColor
     
     color: NeonStyle.textColor
     placeholderTextColor: NeonStyle.textMuted
@@ -13,22 +13,21 @@ TextField {
     selectionColor: accentColor
     selectedTextColor: NeonStyle.textInverse
     
-    padding: 10
-    leftPadding: 12
-    rightPadding: 12
-    topPadding: 10
-    bottomPadding: 10
+    verticalAlignment: TextInput.AlignVCenter
+    
+    padding: 12
+    leftPadding: 16
+    rightPadding: 16
 
     background: Rectangle {
-        implicitWidth: 200
-        implicitHeight: 40
-        color: control.activeFocus ? NeonStyle.surfaceElevated : NeonStyle.surfaceColor
-        radius: NeonStyle.radiusS
+        implicitWidth: 300
+        implicitHeight: 44
+        color: NeonStyle.surfaceLightColor
+        radius: NeonStyle.radiusFull // Pill shaped
         border.color: control.activeFocus ? control.accentColor : NeonStyle.borderColor
-        border.width: 1
+        border.width: 1.5
         
         Behavior on color { ColorAnimation { duration: NeonStyle.animFast } }
         Behavior on border.color { ColorAnimation { duration: NeonStyle.animFast } }
     }
 }
-

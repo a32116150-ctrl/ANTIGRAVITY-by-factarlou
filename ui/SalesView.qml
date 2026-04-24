@@ -13,55 +13,76 @@ Rectangle {
         anchors.margins: NeonStyle.spaceL
         spacing: NeonStyle.spaceL
 
-        // PRODUCT SECTION (LEFT)
+        // MAIN PRODUCT SECTION (LEFT)
         ColumnLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: NeonStyle.spaceM
+            spacing: NeonStyle.spaceL
 
-            // SEARCH & FILTERS
+            // TOP BAR: CATEGORY + SEARCH
             RowLayout {
-                spacing: NeonStyle.spaceM
+                spacing: NeonStyle.spaceL
+                
+                ColumnLayout {
+                    spacing: 0
+                    Text {
+                        text: "Items"
+                        color: NeonStyle.primaryColor
+                        font.pixelSize: NeonStyle.fontSubTitle
+                        font.bold: true
+                    }
+                    RowLayout {
+                        spacing: 8
+                        Text {
+                            text: (posBackend && posBackend.selectedCategory !== 0) ? 
+                                  posBackend.categoriesList.find(c => c.id === posBackend.selectedCategory).name : "All Items"
+                            color: NeonStyle.textColor
+                            font.pixelSize: 28
+                            font.bold: true
+                        }
+                        Text { text: "⌄"; color: NeonStyle.textColor; font.pixelSize: 20; font.bold: true }
+                    }
+                }
+
+                Item { Layout.fillWidth: true }
+
                 NeonTextField {
                     id: productSearch
-                    placeholderText: "Search products..."
-                    Layout.fillWidth: true
+                    placeholderText: "Search items..."
+                    Layout.preferredWidth: 300
                     onTextChanged: if (posBackend) posBackend.searchProducts(text)
                 }
-                
-                NeonButton {
-                    text: "REFRESH"
-                    mainColor: NeonStyle.cyanColor
-                    btnHeight: 40
-                    primary: false
-                    onClicked: if (posBackend) posBackend.refreshInventory()
+
+                Rectangle {
+                    width: 44; height: 44; radius: 12
+                    color: NeonStyle.surfaceLightColor
+                    border.color: NeonStyle.borderColor
+                    Text { anchors.centerIn: parent; text: "⊶"; font.pixelSize: 20; color: NeonStyle.textColor }
                 }
             }
 
-            // CATEGORIES
+            // CATEGORY PILLS
             ScrollView {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 45
-                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                Layout.preferredHeight: 48
+                ScrollBar.horizontal.policy: ScrollBar.AsNeeded
                 
                 RowLayout {
-                    spacing: NeonStyle.spaceS
+                    spacing: 12
                     NeonButton {
-                        text: "ALL"
+                        text: "All"
                         primary: posBackend ? posBackend.selectedCategory === 0 : true
-                        mainColor: NeonStyle.cyanColor
-                        btnHeight: 32
-                        fontSize: NeonStyle.fontCaption
+                        pillRadius: NeonStyle.radiusFull
+                        btnHeight: 40
                         onClicked: if (posBackend) posBackend.filterByCategory(0)
                     }
                     Repeater {
                         model: posBackend ? posBackend.categoriesModel : []
                         NeonButton {
-                            text: modelData.name.toUpperCase()
+                            text: modelData.name
                             primary: posBackend ? posBackend.selectedCategory === modelData.id : false
-                            mainColor: NeonStyle.purpleColor
-                            btnHeight: 32
-                            fontSize: NeonStyle.fontCaption
+                            pillRadius: NeonStyle.radiusFull
+                            btnHeight: 40
                             onClicked: if (posBackend) posBackend.filterByCategory(modelData.id)
                         }
                     }
@@ -74,8 +95,8 @@ Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
-                cellWidth: 190
-                cellHeight: 170
+                cellWidth: 200
+                cellHeight: 220
                 model: posBackend ? posBackend.productsModel : []
 
                 delegate: Item {
@@ -84,90 +105,111 @@ Rectangle {
                     
                     NeonCard {
                         anchors.fill: parent
-                        anchors.margins: 4
-                        glowColor: modelData.stock <= 5 ? NeonStyle.errorColor + "15" : "transparent"
+                        anchors.margins: 8
+                        hasShadow: true
+                        padding: 0
                         
                         ColumnLayout {
                             anchors.fill: parent
-                            spacing: 8
+                            spacing: 0
 
                             Rectangle {
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: 50
+                                Layout.fillHeight: true
                                 color: NeonStyle.surfaceLightColor
                                 radius: NeonStyle.radiusM
+                                Rectangle { // Bottom corner radius fix
+                                    anchors.bottom: parent.bottom
+                                    width: parent.width; height: parent.radius
+                                    color: parent.color
+                                }
+                                
                                 Text {
                                     anchors.centerIn: parent
-                                    text: modelData.name[0].toUpperCase()
-                                    color: NeonStyle.cyanColor
-                                    font.pixelSize: 24
+                                    text: modelData.name.substring(0, 2).toUpperCase()
+                                    color: NeonStyle.primaryColor
+                                    font.pixelSize: 40
                                     font.bold: true
+                                    opacity: 0.3
                                 }
                             }
 
-                            Text {
-                                text: modelData.name
-                                color: NeonStyle.textColor
-                                font.pixelSize: NeonStyle.fontSubTitle
-                                font.bold: true
+                            ColumnLayout {
                                 Layout.fillWidth: true
-                                elide: Text.ElideRight
-                                horizontalAlignment: Text.AlignHCenter
-                            }
+                                Layout.margins: 12
+                                spacing: 4
 
-                            RowLayout {
-                                Layout.fillWidth: true
                                 Text {
-                                    text: Number(modelData.price).toFixed(3)
-                                    color: NeonStyle.greenColor
+                                    text: modelData.name
+                                    color: NeonStyle.textColor
+                                    font.pixelSize: 16
                                     font.bold: true
-                                    font.pixelSize: NeonStyle.fontBody
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
                                 }
-                                Item { Layout.fillWidth: true }
-                                Text {
-                                    text: "Stock: " + modelData.stock
-                                    color: modelData.stock <= 5 ? NeonStyle.errorColor : NeonStyle.textMuted
-                                    font.pixelSize: NeonStyle.fontTiny
-                                }
-                            }
 
-                            NeonButton {
-                                text: "ADD"
-                                Layout.fillWidth: true
-                                btnHeight: 32
-                                mainColor: NeonStyle.cyanColor
-                                fontSize: NeonStyle.fontCaption
-                                onClicked: if (posBackend) posBackend.addToCart(modelData.id)
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    Text {
+                                        text: "TND " + Number(modelData.price).toFixed(3)
+                                        color: NeonStyle.textColor
+                                        font.bold: true
+                                        font.pixelSize: 14
+                                    }
+                                    Item { Layout.fillWidth: true }
+                                    
+                                    // Add Button Circle
+                                    Control {
+                                        width: 32; height: 32
+                                        background: Rectangle {
+                                            radius: 16
+                                            color: NeonStyle.accentColor
+                                            Text { anchors.centerIn: parent; text: "+"; color: "white"; font.bold: true; font.pixelSize: 18 }
+                                        }
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            onClicked: if (posBackend) posBackend.addToCart(modelData.id)
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
-                
-                Text {
-                    anchors.centerIn: parent
-                    text: "No products available."
-                    color: NeonStyle.textMuted
-                    visible: productGrid.count === 0
-                }
             }
         }
 
-        // CART SECTION (RIGHT)
+        // ORDER SUMMARY PANEL (RIGHT)
         NeonCard {
-            Layout.preferredWidth: 360
+            id: orderPanel
+            Layout.preferredWidth: 380
             Layout.fillHeight: true
-            glowColor: NeonStyle.magentaGlow
+            padding: NeonStyle.spaceL
+            hasShadow: true
             
             ColumnLayout {
                 anchors.fill: parent
+                anchors.margins: parent.padding
                 spacing: NeonStyle.spaceM
 
                 Text {
-                    text: "ORDER SUMMARY"
+                    text: "Current Order"
                     color: NeonStyle.textColor
-                    font.pixelSize: NeonStyle.fontTitle
+                    font.pixelSize: 24
                     font.bold: true
                 }
+
+                // USER INFO
+                RowLayout {
+                    spacing: 12
+                    Rectangle {
+                        width: 36; height: 36; radius: 18; color: NeonStyle.surfaceLightColor
+                        Image { anchors.centerIn: parent; width: 24; height: 24; source: "https://api.dicebear.com/7.x/avataaars/svg?seed=Emma" }
+                    }
+                    Text { text: "Cashier Terminal"; color: NeonStyle.textSecondaryColor; font.bold: true }
+                }
+
+                Item { Layout.preferredHeight: 10 }
 
                 // CART LIST
                 ListView {
@@ -176,118 +218,82 @@ Rectangle {
                     Layout.fillHeight: true
                     clip: true
                     model: posBackend ? posBackend.cart : []
-                    spacing: 8
+                    spacing: 16
                     
-                    delegate: Rectangle {
+                    delegate: RowLayout {
                         width: cartView.width
-                        height: 60
-                        color: NeonStyle.surfaceElevated
-                        radius: NeonStyle.radiusS
-                        
+                        spacing: 12
+
+                        Rectangle {
+                            width: 50; height: 50; radius: 8; color: NeonStyle.surfaceLightColor
+                            Text { anchors.centerIn: parent; text: modelData.name[0]; color: NeonStyle.primaryColor; font.bold: true }
+                        }
+
+                        ColumnLayout {
+                            spacing: 2
+                            Layout.fillWidth: true
+                            Text { text: modelData.name; color: NeonStyle.textColor; font.bold: true; elide: Text.ElideRight }
+                            Text { text: "TND " + Number(modelData.price).toFixed(3); color: NeonStyle.textSecondaryColor; font.bold: true }
+                        }
+
                         RowLayout {
-                            anchors.fill: parent
-                            anchors.margins: NeonStyle.spaceM
-                            spacing: 12
-
-                            ColumnLayout {
-                                spacing: 1
-                                Layout.fillWidth: true
-                                Text {
-                                    text: modelData.name
-                                    color: NeonStyle.textColor
-                                    font.bold: true
-                                    font.pixelSize: NeonStyle.fontBody
-                                    elide: Text.ElideRight
-                                }
-                                Text {
-                                    text: Number(modelData.price).toFixed(3) + " x " + modelData.quantity
-                                    color: NeonStyle.textMuted
-                                    font.pixelSize: NeonStyle.fontTiny
-                                }
+                            spacing: 8
+                            // Minus Button
+                            Rectangle {
+                                width: 28; height: 28; radius: 14; border.color: NeonStyle.borderColor; color: "transparent"
+                                Text { anchors.centerIn: parent; text: "−"; color: NeonStyle.textColor; font.bold: true }
+                                MouseArea { anchors.fill: parent; onClicked: if (posBackend) posBackend.cartItemDecrement(index) }
                             }
-
-                            RowLayout {
-                                spacing: 5
-                                Button {
-                                    text: "-"
-                                    width: 28; height: 28
-                                    onClicked: if (posBackend) posBackend.cartItemDecrement(index)
-                                }
-                                Text {
-                                    text: modelData.quantity
-                                    color: NeonStyle.cyanColor
-                                    font.bold: true
-                                    Layout.preferredWidth: 20
-                                    horizontalAlignment: Text.AlignHCenter
-                                }
-                                Button {
-                                    text: "+"
-                                    width: 28; height: 28
-                                    onClicked: if (posBackend) posBackend.cartItemIncrement(index)
-                                }
-                            }
-
-                            Text {
-                                text: (modelData.price * modelData.quantity).toFixed(3)
-                                color: NeonStyle.greenColor
-                                font.bold: true
-                                Layout.preferredWidth: 65
-                                horizontalAlignment: Text.AlignRight
+                            Text { text: modelData.quantity; color: NeonStyle.textColor; font.bold: true; Layout.preferredWidth: 20; horizontalAlignment: Text.AlignHCenter }
+                            // Plus Button
+                            Rectangle {
+                                width: 28; height: 28; radius: 14; color: NeonStyle.accentColor
+                                Text { anchors.centerIn: parent; text: "+"; color: "white"; font.bold: true }
+                                MouseArea { anchors.fill: parent; onClicked: if (posBackend) posBackend.cartItemIncrement(index) }
                             }
                         }
                     }
-                    
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Cart is empty"
-                        color: NeonStyle.textMuted
-                        visible: cartView.count === 0
-                    }
                 }
 
-                // TOTALS
+                // BILLING DETAILS
                 ColumnLayout {
                     Layout.fillWidth: true
-                    spacing: 6
+                    spacing: 12
                     
-                    Rectangle { height: 1; Layout.fillWidth: true; color: NeonStyle.borderColor }
+                    Rectangle { height: 1; Layout.fillWidth: true; color: NeonStyle.borderColor; opacity: 0.5 }
                     
                     RowLayout {
-                        Text { text: "SUBTOTAL"; color: NeonStyle.textMuted; font.pixelSize: NeonStyle.fontCaption }
+                        Text { text: "Subtotal"; color: NeonStyle.textMuted; font.pixelSize: 14 }
                         Item { Layout.fillWidth: true }
-                        Text { text: posBackend ? posBackend.total.toFixed(3) : "0.000"; color: NeonStyle.textColor; font.pixelSize: NeonStyle.fontBody }
+                        Text { text: "TND " + (posBackend ? posBackend.total.toFixed(3) : "0.000"); color: NeonStyle.textColor; font.bold: true }
                     }
-                    
                     RowLayout {
-                        Text { text: "TOTAL"; color: NeonStyle.textColor; font.pixelSize: NeonStyle.fontSubTitle; font.bold: true }
+                        Text { text: "Service Charge"; color: NeonStyle.textMuted; font.pixelSize: 14 }
+                        Item { Layout.fillWidth: true }
+                        Text { text: "19%"; color: NeonStyle.textColor; font.bold: true }
+                    }
+
+                    Rectangle { height: 1; Layout.fillWidth: true; color: NeonStyle.borderColor; Layout.topMargin: 8 }
+
+                    RowLayout {
+                        Layout.topMargin: 8
+                        Text { text: "Total"; color: NeonStyle.textColor; font.pixelSize: 22; font.bold: true }
                         Item { Layout.fillWidth: true }
                         Text { 
                             text: (posBackend ? posBackend.total.toFixed(3) : "0.000") + " TND"
-                            color: NeonStyle.greenColor
-                            font.pixelSize: 22
-                            font.bold: true 
+                            color: NeonStyle.textColor; font.pixelSize: 22; font.bold: true 
                         }
                     }
                 }
 
-                RowLayout {
-                    spacing: NeonStyle.spaceM
-                    NeonButton {
-                        text: "CLEAR"
-                        Layout.fillWidth: true
-                        mainColor: NeonStyle.errorColor
-                        primary: false
-                        btnHeight: 44
-                        onClicked: if (posBackend) posBackend.clearCart()
-                    }
-                    NeonButton {
-                        text: "PAYMENT"
-                        Layout.fillWidth: true
-                        mainColor: NeonStyle.greenColor
-                        primary: true
-                        btnHeight: 44
-                        onClicked: if (posBackend) posBackend.checkout()
-                    }
+                NeonButton {
+                    text: "Continue"
+                    Layout.fillWidth: true
+                    btnHeight: 56
+                    mainColor: NeonStyle.primaryColor
+                    primary: true
+                    pillRadius: 16
+                    onClicked: if (posBackend) posBackend.checkout()
                 }
             }
         }

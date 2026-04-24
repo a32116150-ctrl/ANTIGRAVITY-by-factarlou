@@ -5,17 +5,18 @@ import "../styles"
 
 Button {
     id: control
-    property color mainColor: NeonStyle.cyanColor
+    property color mainColor: NeonStyle.primaryColor
     property bool primary: true
     property int fontSize: NeonStyle.fontBody
-    property int btnHeight: 40
-    property bool glow: true
+    property int btnHeight: 44
+    property bool glow: false // Reduced for light theme
+    property real pillRadius: NeonStyle.radiusL
 
     contentItem: Text {
         text: control.text || ""
         font.pixelSize: control.fontSize
         font.bold: true
-        color: control.primary ? NeonStyle.textInverse : control.mainColor
+        color: control.primary ? NeonStyle.textInverse : (control.hovered ? control.mainColor : NeonStyle.textSecondaryColor)
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         
@@ -26,41 +27,44 @@ Button {
         id: bg
         implicitWidth: 120
         implicitHeight: control.btnHeight
-        radius: NeonStyle.radiusS
-        color: control.primary ? control.mainColor : (control.pressed ? NeonStyle.surfacePressed : NeonStyle.surfaceElevated)
+        radius: control.pillRadius
+        color: control.primary ? control.mainColor : (control.pressed ? NeonStyle.surfacePressed : "transparent")
         border.color: control.primary ? "transparent" : (control.hovered ? control.mainColor : NeonStyle.borderColor)
-        border.width: 1
+        border.width: 1.5
 
         Behavior on color { ColorAnimation { duration: NeonStyle.animFast } }
         Behavior on border.color { ColorAnimation { duration: NeonStyle.animFast } }
 
+        // Subtle overlay for interaction
         Rectangle {
             anchors.fill: parent
-            color: "white"
+            color: "black"
             radius: parent.radius
-            opacity: control.pressed ? 0.1 : (control.hovered ? 0.05 : 0)
+            opacity: control.pressed ? 0.05 : 0
             Behavior on opacity { NumberAnimation { duration: NeonStyle.animFast } }
         }
     }
 
-    // Subtle glow for primary buttons
-    Glow {
+    // Modern soft shadow instead of neon glow
+    DropShadow {
         anchors.fill: bg
-        visible: control.glow && control.primary
-        radius: 6
-        samples: 12
-        color: control.mainColor
+        visible: control.primary && !control.pressed
+        radius: 8
+        samples: 16
+        color: "#20000000"
         source: bg
-        spread: 0.1
+        verticalOffset: 2
     }
 
-    transform: Translate {
-        y: control.pressed ? 1 : 0
-        Behavior on y { NumberAnimation { duration: 50 } }
+    transform: Scale {
+        origin.x: control.width / 2
+        origin.y: control.height / 2
+        xScale: control.pressed ? 0.98 : 1.0
+        yScale: control.pressed ? 0.98 : 1.0
+        Behavior on xScale { NumberAnimation { duration: 50 } }
+        Behavior on yScale { NumberAnimation { duration: 50 } }
     }
 
     Keys.onSpacePressed: control.clicked()
     Keys.onReturnPressed: control.clicked()
 }
-
-

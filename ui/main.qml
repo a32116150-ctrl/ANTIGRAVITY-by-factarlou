@@ -10,7 +10,7 @@ ApplicationWindow {
     height: typeof screenHeight !== "undefined" ? screenHeight : 800
     minimumWidth: 1024
     minimumHeight: 700
-    title: "ANTIGRAVITY POS - Ultra Edition"
+    title: "ANTIGRAVITY POS - Modern Edition"
     color: NeonStyle.backgroundColor
     visible: true
 
@@ -20,109 +20,79 @@ ApplicationWindow {
         anchors.fill: parent
         spacing: 0
 
-        // SIDEBAR NAVIGATION
+        // MINIMAL ICON SIDEBAR (Matches Screenshot)
         Rectangle {
-            Layout.preferredWidth: 240
+            Layout.preferredWidth: 80
             Layout.fillHeight: true
             color: NeonStyle.surfaceColor
             
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: NeonStyle.spaceM
-                spacing: NeonStyle.spaceL
+                spacing: NeonStyle.spaceXL
 
                 // LOGO
-                ColumnLayout {
-                    spacing: 0
+                Rectangle {
+                    width: 48; height: 48; radius: 24
+                    color: "transparent"
+                    border.color: NeonStyle.primaryColor
+                    border.width: 3
                     Layout.alignment: Qt.AlignHCenter
                     Text {
-                        text: "ANTIGRAVITY"
-                        color: NeonStyle.cyanColor
+                        anchors.centerIn: parent
+                        text: "A"
+                        color: NeonStyle.primaryColor
                         font.pixelSize: 24
                         font.bold: true
-                        font.letterSpacing: 2
-                    }
-                    Text {
-                        text: "v3.0 ULTRA"
-                        color: NeonStyle.textMuted
-                        font.pixelSize: 10
-                        font.bold: true
-                        Layout.alignment: Qt.AlignRight
                     }
                 }
 
-                Item { Layout.preferredHeight: 20 }
-
-                // NAV BUTTONS
+                // NAV ICONS
                 ColumnLayout {
                     Layout.fillWidth: true
-                    spacing: NeonStyle.spaceS
+                    spacing: NeonStyle.spaceL
+                    Layout.alignment: Qt.AlignHCenter
 
-                    NeonButton {
-                        text: "DASHBOARD"
-                        Layout.fillWidth: true
-                        primary: currentView === "dashboard"
-                        mainColor: NeonStyle.cyanColor
+                    SidebarIcon { 
+                        iconText: "🏠" 
+                        active: currentView === "dashboard"
                         onClicked: { currentView = "dashboard"; loadView() }
                     }
-
-                    NeonButton {
-                        text: "SALES TERMINAL"
-                        Layout.fillWidth: true
-                        primary: currentView === "sales"
-                        mainColor: NeonStyle.magentaColor
+                    SidebarIcon { 
+                        iconText: "🛒" 
+                        active: currentView === "sales"
                         onClicked: { currentView = "sales"; loadView() }
                     }
-
-                    NeonButton {
-                        text: "INVENTORY"
-                        Layout.fillWidth: true
-                        primary: currentView === "inventory"
-                        mainColor: NeonStyle.greenColor
+                    SidebarIcon { 
+                        iconText: "📦" 
+                        active: currentView === "inventory"
                         onClicked: { currentView = "inventory"; loadView() }
                     }
-
-                    NeonButton {
-                        text: "REPORTS"
-                        Layout.fillWidth: true
-                        primary: currentView === "reports"
-                        mainColor: NeonStyle.goldColor
+                    SidebarIcon { 
+                        iconText: "📊" 
+                        active: currentView === "reports"
                         onClicked: { currentView = "reports"; loadView() }
-                    }
-
-                    NeonButton {
-                        text: "SETTINGS"
-                        Layout.fillWidth: true
-                        primary: currentView === "settings"
-                        mainColor: NeonStyle.purpleColor
-                        onClicked: { currentView = "settings"; loadView() }
                     }
                 }
 
                 Item { Layout.fillHeight: true }
 
-                // FOOTER STATS
-                NeonCard {
+                // BOTTOM ICONS
+                ColumnLayout {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 100
-                    glowColor: NeonStyle.cyanGlow
-                    
-                    ColumnLayout {
-                        anchors.centerIn: parent
-                        Text {
-                            text: "SYSTEM STATUS"
-                            color: NeonStyle.textMuted
-                            font.pixelSize: 10
-                            font.bold: true
-                        }
-                        RowLayout {
-                            Rectangle { width: 8; height: 8; radius: 4; color: NeonStyle.successColor }
-                            Text { text: "Database Online"; color: NeonStyle.textColor; font.pixelSize: 12 }
-                        }
-                        RowLayout {
-                            Rectangle { width: 8; height: 8; radius: 4; color: NeonStyle.successColor }
-                            Text { text: "Printer Ready"; color: NeonStyle.textColor; font.pixelSize: 12 }
-                        }
+                    spacing: NeonStyle.spaceL
+                    Layout.alignment: Qt.AlignHCenter
+
+                    SidebarIcon { 
+                        iconText: "⚙️" 
+                        active: currentView === "settings"
+                        onClicked: { currentView = "settings"; loadView() }
+                    }
+                    SidebarIcon { 
+                        iconText: "⏻" 
+                        active: false
+                        mainColor: NeonStyle.errorColor
+                        onClicked: Qt.quit()
                     }
                 }
             }
@@ -134,48 +104,59 @@ ApplicationWindow {
             Layout.fillHeight: true
             spacing: 0
 
-            // TOP BAR
+            // TOP BAR (Simplified)
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 60
-                color: NeonStyle.backgroundColor
+                Layout.preferredHeight: 80
+                color: "transparent"
                 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.margins: NeonStyle.spaceM
+                    anchors.margins: NeonStyle.spaceL
                     
-                    Text {
-                        text: currentView.toUpperCase()
-                        color: NeonStyle.textSecondaryColor
-                        font.pixelSize: 18
-                        font.bold: true
+                    ColumnLayout {
+                        spacing: 2
+                        Text {
+                            text: "ANTIGRAVITY POS"
+                            color: NeonStyle.textSecondaryColor
+                            font.pixelSize: 12
+                            font.bold: true
+                            font.letterSpacing: 1
+                        }
+                        Text {
+                            text: currentView === "sales" ? "Sales Terminal" : currentView.charAt(0).toUpperCase() + currentView.slice(1)
+                            color: NeonStyle.textColor
+                            font.pixelSize: 24
+                            font.bold: true
+                        }
                     }
 
                     Item { Layout.fillWidth: true }
 
                     RowLayout {
                         spacing: NeonStyle.spaceM
-                        ColumnLayout {
-                            spacing: 0
-                            Text {
-                                text: Qt.formatDateTime(new Date(), "dddd, dd MMMM")
-                                color: NeonStyle.textMuted
-                                font.pixelSize: 12
-                                horizontalAlignment: Text.AlignRight
-                            }
-                            Text {
-                                text: Qt.formatDateTime(new Date(), "HH:mm:ss")
-                                color: NeonStyle.textColor
-                                font.pixelSize: 16
-                                font.bold: true
-                                horizontalAlignment: Text.AlignRight
-                            }
+                        
+                        Text {
+                            id: timeText
+                            text: Qt.formatDateTime(new Date(), "HH:mm")
+                            color: NeonStyle.textColor
+                            font.pixelSize: 18
+                            font.bold: true
                         }
                         
+                        Timer {
+                            interval: 10000; running: true; repeat: true
+                            onTriggered: timeText.text = Qt.formatDateTime(new Date(), "HH:mm")
+                        }
+
                         Rectangle {
-                            width: 40; height: 40; radius: 20
-                            color: NeonStyle.surfaceElevated
-                            Text { anchors.centerIn: parent; text: "AC"; color: NeonStyle.cyanColor; font.bold: true }
+                            width: 44; height: 44; radius: 22
+                            color: NeonStyle.surfaceLightColor
+                            Image {
+                                anchors.centerIn: parent
+                                width: 24; height: 24
+                                source: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"
+                            }
                         }
                     }
                 }
@@ -186,16 +167,53 @@ ApplicationWindow {
                 id: viewLoader
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                clip: true
                 
                 Behavior on opacity { NumberAnimation { duration: 250 } }
             }
         }
     }
 
+    // INTERNAL COMPONENT FOR SIDEBAR ICONS
+    component SidebarIcon : Control {
+        id: iconControl
+        property string iconText: ""
+        property bool active: false
+        property color mainColor: NeonStyle.primaryColor
+        
+        implicitWidth: 50
+        implicitHeight: 50
+        
+        signal clicked()
+        
+        background: Rectangle {
+            radius: 12
+            color: iconControl.active ? NeonStyle.primaryGlow : "transparent"
+            Behavior on color { ColorAnimation { duration: 200 } }
+        }
+        
+        contentItem: Text {
+            text: iconControl.iconText
+            font.pixelSize: 24
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            color: iconControl.active ? iconControl.mainColor : NeonStyle.textMuted
+            opacity: iconControl.active ? 1.0 : 0.6
+            
+            Behavior on color { ColorAnimation { duration: 200 } }
+            Behavior on opacity { NumberAnimation { duration: 200 } }
+        }
+        
+        MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+            onClicked: iconControl.clicked()
+            cursorShape: Qt.PointingHandCursor
+        }
+    }
+
     function loadView() {
         viewLoader.opacity = 0
-        
-        // Use a slight delay to ensure smooth transition
         Qt.callLater(function() {
             var viewUrl = "DashboardView.qml"
             if (currentView === "sales") viewUrl = "SalesView.qml"

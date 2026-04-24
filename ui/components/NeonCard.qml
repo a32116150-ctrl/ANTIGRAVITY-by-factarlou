@@ -5,9 +5,10 @@ import "../styles"
 Item {
     id: root
     
-    property color glowColor: "transparent"
+    property color shadowColor: "#10000000"
     property alias content: container.data
     property int padding: NeonStyle.spaceM
+    property bool hasShadow: true
     
     Rectangle {
         id: bg
@@ -24,13 +25,13 @@ Item {
         }
     }
 
-    Glow {
+    DropShadow {
         anchors.fill: bg
-        visible: root.glowColor !== "transparent"
-        radius: 10
-        samples: 20
-        color: root.glowColor
+        visible: root.hasShadow
+        radius: 12
+        samples: 24
+        color: root.shadowColor
         source: bg
-        spread: 0.1
+        verticalOffset: 4
     }
 }
