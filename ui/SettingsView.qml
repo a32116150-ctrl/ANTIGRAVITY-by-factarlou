@@ -8,156 +8,364 @@ Rectangle {
     id: root
     color: NeonStyle.backgroundColor
 
+    // ─── ROOT LAYOUT ────────────────────────────────────────────────────────────
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: NeonStyle.spaceL
         spacing: NeonStyle.spaceL
 
+        // ── HEADER ROW ──────────────────────────────────────────────────────────
         RowLayout {
+            Layout.fillWidth: true
+            spacing: NeonStyle.spaceM
+
             ColumnLayout {
-                spacing: 2
+                spacing: 4
                 Text {
                     text: "SYSTEM SETTINGS"
                     color: NeonStyle.textColor
-                    font.pixelSize: NeonStyle.fontHeader
+                    font.pixelSize: 28
                     font.bold: true
+                    font.letterSpacing: 0.5
                 }
                 Text {
                     text: "Configure store preferences and hardware"
-                    color: NeonStyle.textSecondaryColor
-                    font.pixelSize: NeonStyle.fontBody
+                    color: NeonStyle.textMuted
+                    font.pixelSize: 14
                 }
             }
+
             Item { Layout.fillWidth: true }
-            NeonButton {
-                text: "SAVE ALL"
-                mainColor: NeonStyle.greenColor
-                btnHeight: 40
-                onClicked: saveAll()
+
+            // Save button – plain Rectangle so we don't fight NeonButton sizing
+            Rectangle {
+                width: 140; height: 44
+                radius: NeonStyle.radiusM
+                color: saveHover.containsMouse ? NeonStyle.primaryDarkColor : NeonStyle.primaryColor
+
+                Behavior on color { ColorAnimation { duration: 120 } }
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "SAVE ALL"
+                    color: "white"
+                    font.bold: true
+                    font.pixelSize: 13
+                    font.letterSpacing: 1
+                }
+                MouseArea {
+                    id: saveHover
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: saveAll()
+                }
             }
         }
 
+        // ── SCROLLABLE BODY ──────────────────────────────────────────────────────
+        // FIX #1: contentWidth stops the horizontal scroll fight.
+        // FIX #2: ColumnLayout width = parent.width, NOT root.width - 60.
         ScrollView {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
+            contentWidth: availableWidth          // ← the key fix for horizontal jitter
 
             ColumnLayout {
-                width: parent.width - 24
-                spacing: NeonStyle.spaceL
+                width: parent.width               // parent = ScrollView.contentItem
+                spacing: NeonStyle.spaceM
 
-                NeonCard {
+                // ── CARD HELPER: styled Rectangle whose height = content + padding ──
+                // We use plain Rectangles instead of NeonCard because NeonCard
+                // loses its implicit height when children use anchors.fill.
+
+                // ── 1. STORE IDENTIFICATION ──────────────────────────────────────
+                Rectangle {
                     Layout.fillWidth: true
-                    height: storeCol.implicitHeight + 40
-                    
+                    // FIX #3: implicitHeight drives the card's height from its content.
+                    implicitHeight: storeIdLayout.implicitHeight + NeonStyle.spaceL * 2
+                    radius: NeonStyle.radiusL
+                    color: NeonStyle.surfaceColor
+                    border.color: NeonStyle.borderColor
+                    border.width: 1
+
+                    // Subtle left accent stripe
+                    Rectangle {
+                        width: 4; height: 20; radius: 2
+                        anchors.left: parent.left
+                        anchors.leftMargin: NeonStyle.spaceL
+                        anchors.top: parent.top
+                        anchors.topMargin: NeonStyle.spaceL
+                        color: NeonStyle.primaryColor
+                    }
+
                     ColumnLayout {
-                        id: storeCol
-                        anchors.fill: parent
+                        id: storeIdLayout
+                        // FIX #4: position with x/y + explicit width, never anchors.fill
+                        x: NeonStyle.spaceL
+                        y: NeonStyle.spaceL
+                        width: parent.width - NeonStyle.spaceL * 2
                         spacing: NeonStyle.spaceM
-                        
-                        Text { text: "STORE IDENTIFICATION"; color: NeonStyle.cyanColor; font.bold: true; font.pixelSize: NeonStyle.fontSubTitle }
-                        
+
+                        Text {
+                            text: "STORE IDENTIFICATION"
+                            color: NeonStyle.primaryColor
+                            font.bold: true
+                            font.pixelSize: 13
+                            font.letterSpacing: 1.2
+                            leftPadding: 14      // indent past the stripe
+                        }
+
                         GridLayout {
+                            Layout.fillWidth: true
                             columns: 2
                             columnSpacing: NeonStyle.spaceM
                             rowSpacing: NeonStyle.spaceM
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 5
+                                Text { text: "STORE NAME"; color: NeonStyle.textMuted; font.pixelSize: 11; font.bold: true; font.letterSpacing: 0.5 }
+                                NeonTextField {
+                                    id: store_name
+                                    Layout.fillWidth: true
+                                    text: (posBackend && posBackend.settings) ? (posBackend.settings.store_name || "") : ""
+                                }
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 5
+                                Text { text: "TAX ID"; color: NeonStyle.textMuted; font.pixelSize: 11; font.bold: true; font.letterSpacing: 0.5 }
+                                NeonTextField {
+                                    id: store_tax_id
+                                    Layout.fillWidth: true
+                                    text: (posBackend && posBackend.settings) ? (posBackend.settings.store_tax_id || "") : ""
+                                }
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 5
+                                Text { text: "PHONE"; color: NeonStyle.textMuted; font.pixelSize: 11; font.bold: true; font.letterSpacing: 0.5 }
+                                NeonTextField {
+                                    id: store_phone
+                                    Layout.fillWidth: true
+                                    text: (posBackend && posBackend.settings) ? (posBackend.settings.store_phone || "") : ""
+                                }
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 5
+                                Text { text: "ADDRESS"; color: NeonStyle.textMuted; font.pixelSize: 11; font.bold: true; font.letterSpacing: 0.5 }
+                                NeonTextField {
+                                    id: store_address
+                                    Layout.fillWidth: true
+                                    text: (posBackend && posBackend.settings) ? (posBackend.settings.store_address || "") : ""
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ── 2. FISCAL & CURRENCY ─────────────────────────────────────────
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: fiscalLayout.implicitHeight + NeonStyle.spaceL * 2
+                    radius: NeonStyle.radiusL
+                    color: NeonStyle.surfaceColor
+                    border.color: NeonStyle.borderColor
+                    border.width: 1
+
+                    Rectangle {
+                        width: 4; height: 20; radius: 2
+                        anchors.left: parent.left
+                        anchors.leftMargin: NeonStyle.spaceL
+                        anchors.top: parent.top
+                        anchors.topMargin: NeonStyle.spaceL
+                        color: NeonStyle.greenColor
+                    }
+
+                    ColumnLayout {
+                        id: fiscalLayout
+                        x: NeonStyle.spaceL
+                        y: NeonStyle.spaceL
+                        width: parent.width - NeonStyle.spaceL * 2
+                        spacing: NeonStyle.spaceM
+
+                        Text {
+                            text: "FISCAL & CURRENCY"
+                            color: NeonStyle.greenColor
+                            font.bold: true
+                            font.pixelSize: 13
+                            font.letterSpacing: 1.2
+                            leftPadding: 14
+                        }
+
+                        RowLayout {
                             Layout.fillWidth: true
-                            
-                            ColumnLayout {
-                                Text { text: "Store Name"; color: NeonStyle.textSecondaryColor; font.pixelSize: 11 }
-                                NeonTextField { id: store_name; text: posBackend ? (posBackend.settings.store_name || "") : ""; Layout.fillWidth: true }
-                            }
-                            ColumnLayout {
-                                Text { text: "Tax ID"; color: NeonStyle.textSecondaryColor; font.pixelSize: 11 }
-                                NeonTextField { id: store_tax_id; text: posBackend ? (posBackend.settings.store_tax_id || "") : ""; Layout.fillWidth: true }
-                            }
-                            ColumnLayout {
-                                Text { text: "Phone"; color: NeonStyle.textSecondaryColor; font.pixelSize: 11 }
-                                NeonTextField { id: store_phone; text: posBackend ? (posBackend.settings.store_phone || "") : ""; Layout.fillWidth: true }
-                            }
-                            ColumnLayout {
-                                Text { text: "Address"; color: NeonStyle.textSecondaryColor; font.pixelSize: 11 }
-                                NeonTextField { id: store_address; text: posBackend ? (posBackend.settings.store_address || "") : ""; Layout.fillWidth: true }
-                            }
-                        }
-                    }
-                }
-
-                NeonCard {
-                    Layout.fillWidth: true
-                    height: fiscalCol.implicitHeight + 40
-                    
-                    ColumnLayout {
-                        id: fiscalCol
-                        anchors.fill: parent
-                        spacing: NeonStyle.spaceM
-                        
-                        Text { text: "FISCAL & CURRENCY"; color: NeonStyle.magentaColor; font.bold: true; font.pixelSize: NeonStyle.fontSubTitle }
-                        
-                        RowLayout {
                             spacing: NeonStyle.spaceM
+
                             ColumnLayout {
-                                Text { text: "VAT (%)"; color: NeonStyle.textSecondaryColor; font.pixelSize: 11 }
-                                NeonTextField { id: tax_rate; text: posBackend ? (posBackend.settings.tax_rate || "19") : "19"; Layout.fillWidth: true }
+                                Layout.fillWidth: true
+                                spacing: 5
+                                Text { text: "VAT (%)"; color: NeonStyle.textMuted; font.pixelSize: 11; font.bold: true; font.letterSpacing: 0.5 }
+                                NeonTextField {
+                                    id: tax_rate
+                                    Layout.fillWidth: true
+                                    text: (posBackend && posBackend.settings) ? (posBackend.settings.tax_rate || "19") : "19"
+                                }
                             }
+
                             ColumnLayout {
-                                Text { text: "Currency"; color: NeonStyle.textSecondaryColor; font.pixelSize: 11 }
-                                NeonTextField { id: currency; text: posBackend ? (posBackend.settings.currency || "TND") : "TND"; Layout.fillWidth: true }
+                                Layout.fillWidth: true
+                                spacing: 5
+                                Text { text: "CURRENCY"; color: NeonStyle.textMuted; font.pixelSize: 11; font.bold: true; font.letterSpacing: 0.5 }
+                                NeonTextField {
+                                    id: currency
+                                    Layout.fillWidth: true
+                                    text: (posBackend && posBackend.settings) ? (posBackend.settings.currency || "TND") : "TND"
+                                }
                             }
+
                             ColumnLayout {
-                                Text { text: "Stock Alert"; color: NeonStyle.textSecondaryColor; font.pixelSize: 11 }
-                                NeonTextField { id: low_stock_threshold; text: posBackend ? (posBackend.settings.low_stock_threshold || "5") : "5"; Layout.fillWidth: true }
+                                Layout.fillWidth: true
+                                spacing: 5
+                                Text { text: "LOW STOCK ALERT"; color: NeonStyle.textMuted; font.pixelSize: 11; font.bold: true; font.letterSpacing: 0.5 }
+                                NeonTextField {
+                                    id: low_stock_threshold
+                                    Layout.fillWidth: true
+                                    text: (posBackend && posBackend.settings) ? (posBackend.settings.low_stock_threshold || "5") : "5"
+                                }
                             }
                         }
                     }
                 }
 
-                NeonCard {
+                // ── 3. SYSTEM ACTIONS ────────────────────────────────────────────
+                Rectangle {
                     Layout.fillWidth: true
-                    height: actionCol.implicitHeight + 40
-                    glowColor: NeonStyle.purpleGlow
-                    
+                    implicitHeight: actionsLayout.implicitHeight + NeonStyle.spaceL * 2
+                    radius: NeonStyle.radiusL
+                    color: NeonStyle.surfaceColor
+                    border.color: NeonStyle.borderColor
+                    border.width: 1
+
+                    Rectangle {
+                        width: 4; height: 20; radius: 2
+                        anchors.left: parent.left
+                        anchors.leftMargin: NeonStyle.spaceL
+                        anchors.top: parent.top
+                        anchors.topMargin: NeonStyle.spaceL
+                        color: NeonStyle.accentColor
+                    }
+
                     ColumnLayout {
-                        id: actionCol
-                        anchors.fill: parent
+                        id: actionsLayout
+                        x: NeonStyle.spaceL
+                        y: NeonStyle.spaceL
+                        width: parent.width - NeonStyle.spaceL * 2
                         spacing: NeonStyle.spaceM
-                        
-                        Text { text: "SYSTEM ACTIONS"; color: NeonStyle.purpleColor; font.bold: true; font.pixelSize: NeonStyle.fontSubTitle }
-                        
+
+                        Text {
+                            text: "SYSTEM ACTIONS"
+                            color: NeonStyle.textColor
+                            font.bold: true
+                            font.pixelSize: 13
+                            font.letterSpacing: 1.2
+                            leftPadding: 14
+                        }
+
                         RowLayout {
+                            Layout.fillWidth: true
                             spacing: NeonStyle.spaceM
-                            NeonButton { text: "TEST PRINTER"; mainColor: NeonStyle.purpleColor; primary: false; Layout.fillWidth: true; btnHeight: 36 }
-                            NeonButton { text: "SCANNER INFO"; mainColor: NeonStyle.purpleColor; primary: false; Layout.fillWidth: true; btnHeight: 36 }
-                            NeonButton { text: "DB BACKUP"; mainColor: NeonStyle.purpleColor; primary: false; Layout.fillWidth: true; btnHeight: 36 }
+
+                            // ── Action button component (inline) ──
+                            Repeater {
+                                model: [
+                                    { icon: "🖨️", label: "TEST PRINTER" },
+                                    { icon: "📡", label: "SCANNER INFO" },
+                                    { icon: "💾", label: "DB BACKUP"    }
+                                ]
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    height: 64
+                                    radius: NeonStyle.radiusM
+                                    color: actionHover.containsMouse ? NeonStyle.surfacePressed : NeonStyle.surfaceLightColor
+                                    border.color: NeonStyle.borderColor
+                                    border.width: 1
+
+                                    Behavior on color { ColorAnimation { duration: 100 } }
+
+                                    ColumnLayout {
+                                        anchors.centerIn: parent
+                                        spacing: 4
+
+                                        Text {
+                                            Layout.alignment: Qt.AlignHCenter
+                                            text: modelData.icon
+                                            font.pixelSize: 22
+                                        }
+                                        Text {
+                                            Layout.alignment: Qt.AlignHCenter
+                                            text: modelData.label
+                                            color: NeonStyle.textColor
+                                            font.bold: true
+                                            font.pixelSize: 11
+                                            font.letterSpacing: 0.5
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        id: actionHover
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                    }
+                                }
+                            }
                         }
                     }
                 }
 
+                // ── STATUS MESSAGE ───────────────────────────────────────────────
                 Text {
                     id: statusMsg
-                    text: ""
-                    color: NeonStyle.successColor
-                    font.pixelSize: NeonStyle.fontBody
                     Layout.alignment: Qt.AlignHCenter
+                    text: ""
+                    color: NeonStyle.greenColor
+                    font.pixelSize: 14
+                    font.bold: true
+                    visible: text !== ""
+
+                    Timer {
+                        id: clearTimer
+                        interval: 3000
+                        onTriggered: statusMsg.text = ""
+                    }
                 }
-                
-                Item { height: 30 }
+
+                Item { Layout.preferredHeight: NeonStyle.spaceL }
             }
         }
     }
 
+    // ─── SAVE HANDLER ────────────────────────────────────────────────────────────
     function saveAll() {
         if (!posBackend) return
         posBackend.saveSettings({
-            "store_name": store_name.text,
-            "store_tax_id": store_tax_id.text,
-            "store_phone": store_phone.text,
-            "store_address": store_address.text,
-            "tax_rate": tax_rate.text,
-            "currency": currency.text,
-            "low_stock_threshold": low_stock_threshold.text
+            "store_name":           store_name.text,
+            "store_tax_id":         store_tax_id.text,
+            "store_phone":          store_phone.text,
+            "store_address":        store_address.text,
+            "tax_rate":             tax_rate.text,
+            "currency":             currency.text,
+            "low_stock_threshold":  low_stock_threshold.text
         })
-        statusMsg.text = "Settings saved!"
-        // Timer to clear status message
+        statusMsg.text = "✓ Settings saved successfully!"
+        clearTimer.restart()
     }
 }

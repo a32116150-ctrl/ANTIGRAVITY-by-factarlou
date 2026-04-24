@@ -18,13 +18,13 @@ Rectangle {
             Text {
                 text: "ANALYTICS & REPORTS"
                 color: NeonStyle.textColor
-                font.pixelSize: NeonStyle.fontHeader
+                font.pixelSize: 28
                 font.bold: true
             }
             Text {
                 text: "Track your business growth and financial performance"
                 color: NeonStyle.textSecondaryColor
-                font.pixelSize: NeonStyle.fontBody
+                font.pixelSize: 14
             }
         }
 
@@ -35,7 +35,8 @@ Rectangle {
             NeonCard {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 200
-                glowColor: NeonStyle.greenGlow
+                hasShadow: true
+                padding: NeonStyle.spaceL
                 
                 ColumnLayout {
                     anchors.centerIn: parent
@@ -43,21 +44,21 @@ Rectangle {
                     Text {
                         text: "TOTAL REVENUE"
                         color: NeonStyle.textSecondaryColor
-                        font.pixelSize: NeonStyle.fontSubTitle
+                        font.pixelSize: 16
                         font.bold: true
                         Layout.alignment: Qt.AlignHCenter
                     }
                     Text {
-                        text: (backend.dailySummary.revenue || 0).toFixed(3) + " TND"
+                        text: ((posBackend && posBackend.dailySummary) ? (posBackend.dailySummary.revenue || 0).toFixed(3) : "0.000") + " TND"
                         color: NeonStyle.greenColor
                         font.pixelSize: 48
                         font.bold: true
                         Layout.alignment: Qt.AlignHCenter
                     }
                     Text {
-                        text: "Across " + (backend.dailySummary.count || 0) + " successful transactions"
+                        text: "Across " + ((posBackend && posBackend.dailySummary) ? (posBackend.dailySummary.count || 0) : "0") + " successful transactions"
                         color: NeonStyle.textMuted
-                        font.pixelSize: NeonStyle.fontBody
+                        font.pixelSize: 14
                         Layout.alignment: Qt.AlignHCenter
                     }
                 }
@@ -67,15 +68,18 @@ Rectangle {
         NeonCard {
             Layout.fillWidth: true
             Layout.fillHeight: true
+            hasShadow: true
+            padding: NeonStyle.spaceL
             
             ColumnLayout {
                 anchors.fill: parent
+                anchors.margins: parent.padding
                 spacing: NeonStyle.spaceM
                 
                 Text {
                     text: "AVAILABLE ACTIONS"
                     color: NeonStyle.textColor
-                    font.pixelSize: NeonStyle.fontTitle
+                    font.pixelSize: 20
                     font.bold: true
                 }
                 
@@ -84,20 +88,19 @@ Rectangle {
                     
                     NeonButton {
                         text: "GENERATE Z-REPORT"
-                        mainColor: NeonStyle.cyanColor
+                        mainColor: NeonStyle.primaryColor
                         btnHeight: 60
                         Layout.fillWidth: true
                         onClicked: {
-                            if (backend) backend.print_z_report(backend.dailySummary)
+                            if (posBackend) posBackend.print_z_report(posBackend.dailySummary)
                         }
                     }
                     
                     NeonButton {
                         text: "EXPORT TO PDF"
-                        mainColor: NeonStyle.magentaColor
+                        primary: false
                         btnHeight: 60
                         Layout.fillWidth: true
-                        primary: false
                     }
                 }
                 
@@ -106,7 +109,7 @@ Rectangle {
                 Text {
                     text: "Reports are generated based on the current fiscal day."
                     color: NeonStyle.textMuted
-                    font.pixelSize: NeonStyle.fontCaption
+                    font.pixelSize: 12
                     font.italic: true
                 }
             }
@@ -114,6 +117,6 @@ Rectangle {
     }
 
     Component.onCompleted: {
-        if (backend) backend.request_daily_summary()
+        if (posBackend) posBackend.request_daily_summary()
     }
 }

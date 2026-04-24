@@ -121,7 +121,6 @@ class POSBackend(QObject):
         self.dailySummaryChanged.emit(self._dailySummary)
 
     # Slots
-    # Slots
     @Slot(str)
     def changeView(self, view):
         self._currentView = view
@@ -261,7 +260,7 @@ class POSBackend(QObject):
         rows = self.db.query("SELECT * FROM invoices WHERE iid = ?", (iid,))
         return rows[0] if rows else None
 
-    # Aliases for compatibility with different UI versions
+    # Aliases for compatibility
     @Slot(int)
     def add_to_cart(self, product_id): self.addToCart(product_id)
     
@@ -288,16 +287,16 @@ class POSBackend(QObject):
     def print_z_report(self, summary):
         import datetime, sys, traceback
         try:
-            if summary is None:
+            if not isinstance(summary, dict):
                 summary = {}
+            
             base_dir = os.path.dirname(os.path.abspath(__file__))
-            if not base_dir:
-                base_dir = "."
             receipts_dir = os.path.join(base_dir, "receipts")
             os.makedirs(receipts_dir, exist_ok=True)
             
-            date_str = summary.get('date', 'today') if summary else 'today'
+            date_str = summary.get('date', 'today')
             filename = os.path.join(receipts_dir, f"Z_REPORT_{date_str}.txt")
+            
             lines = [
                 "    DAILY Z-REPORT",
                 "=" * 30,
@@ -311,43 +310,29 @@ class POSBackend(QObject):
                 "=" * 30,
                 datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             ]
+            
             with open(filename, "w") as f:
                 f.write("\n".join(lines))
-                f.flush()
-            sys.stdout.flush()
+            
             import subprocess
-            print("Z-Report:", filename, flush=True)
-            subprocess.Popen(['open', filename])
+            if sys.platform == "darwin":
+                subprocess.Popen(['open', filename])
+            elif sys.platform == "win32":
+                os.startfile(filename)
+            else:
+                subprocess.Popen(['xdg-open', filename])
+                
         except Exception as e:
-            print("Error:", e, flush=True)
+            print("Error printing Z-Report:", e)
             traceback.print_exc()
 
 if __name__ == "__main__":
     app = QGuiApplication(sys.argv)
     os.environ["QT_QUICK_CONTROLS_STYLE"] = "Basic"
     
-    # Responsiveness & Window Sizing
-    screen = app.primaryScreen().availableGeometry()
-    screen_w = screen.width()
-    screen_h = screen.height()
-    
-    # Priority: Full HD (1920x1080)
-    target_w = 1920
-    target_h = 1080
-    
-    # Adapt if screen is smaller
-    if screen_w < target_w:
-        target_w = int(screen_w * 0.95)
-    if screen_h < target_h:
-        target_h = int(screen_h * 0.9)
-
     backend = POSBackend()
-    
     engine = QQmlApplicationEngine()
     
-    # Expose screen info for adaptive QML
-    engine.rootContext().setContextProperty("screenWidth", target_w)
-    engine.rootContext().setContextProperty("screenHeight", target_h)
     engine.rootContext().setContextProperty("backend", backend)
     engine.rootContext().setContextProperty("posBackend", backend)
     
@@ -355,7 +340,12 @@ if __name__ == "__main__":
     engine.load(qml_file)
     
     if not engine.rootObjects():
+        print("Error: QML engine failed to load root objects.")
         sys.exit(-1)
         
-    sys.exit(app.exec())
-
+    exit_code = app.exec()
+    if hasattr(backend, 'scanner'):
+        try: backend.scanner.stop()
+        except: pass
+            
+    sys.exit(exit_code)

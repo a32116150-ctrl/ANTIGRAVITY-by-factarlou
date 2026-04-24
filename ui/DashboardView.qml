@@ -9,7 +9,7 @@ Rectangle {
     color: NeonStyle.backgroundColor
     
     Component.onCompleted: {
-        if (backend) backend.request_daily_summary()
+        if (posBackend) posBackend.request_daily_summary()
     }
 
     ColumnLayout {
@@ -23,13 +23,13 @@ Rectangle {
             Text {
                 text: "DASHBOARD OVERVIEW"
                 color: NeonStyle.textColor
-                font.pixelSize: NeonStyle.fontHeader
+                font.pixelSize: 28
                 font.bold: true
             }
             Text {
                 text: "Real-time business performance metrics"
                 color: NeonStyle.textSecondaryColor
-                font.pixelSize: NeonStyle.fontBody
+                font.pixelSize: 14
             }
         }
 
@@ -41,22 +41,22 @@ Rectangle {
             NeonCard {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 120
-                glowColor: NeonStyle.cyanGlow
+                hasShadow: true
                 
                 ColumnLayout {
                     anchors.centerIn: parent
-                    spacing: NeonStyle.spaceXS
+                    spacing: 4
                     Text {
                         text: "DAILY REVENUE"
                         color: NeonStyle.textSecondaryColor
-                        font.pixelSize: NeonStyle.fontCaption
+                        font.pixelSize: 12
                         font.bold: true
                         Layout.alignment: Qt.AlignHCenter
                     }
                     Text {
-                        text: (backend.dailySummary.revenue || 0).toFixed(3) + " TND"
-                        color: NeonStyle.cyanColor
-                        font.pixelSize: NeonStyle.fontHeader
+                        text: ((posBackend && posBackend.dailySummary) ? (posBackend.dailySummary.revenue || 0).toFixed(3) : "0.000") + " TND"
+                        color: NeonStyle.primaryColor
+                        font.pixelSize: 28
                         font.bold: true
                         Layout.alignment: Qt.AlignHCenter
                     }
@@ -66,22 +66,22 @@ Rectangle {
             NeonCard {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 120
-                glowColor: NeonStyle.magentaGlow
+                hasShadow: true
                 
                 ColumnLayout {
                     anchors.centerIn: parent
-                    spacing: NeonStyle.spaceXS
+                    spacing: 4
                     Text {
                         text: "TRANSACTIONS"
                         color: NeonStyle.textSecondaryColor
-                        font.pixelSize: NeonStyle.fontCaption
+                        font.pixelSize: 12
                         font.bold: true
                         Layout.alignment: Qt.AlignHCenter
                     }
                     Text {
-                        text: backend.dailySummary.count || 0
-                        color: NeonStyle.magentaColor
-                        font.pixelSize: NeonStyle.fontHeader
+                        text: (posBackend && posBackend.dailySummary) ? (posBackend.dailySummary.count || 0) : "0"
+                        color: NeonStyle.accentColor
+                        font.pixelSize: 28
                         font.bold: true
                         Layout.alignment: Qt.AlignHCenter
                     }
@@ -91,22 +91,22 @@ Rectangle {
             NeonCard {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 120
-                glowColor: NeonStyle.greenGlow
+                hasShadow: true
                 
                 ColumnLayout {
                     anchors.centerIn: parent
-                    spacing: NeonStyle.spaceXS
+                    spacing: 4
                     Text {
                         text: "VAT COLLECTED"
                         color: NeonStyle.textSecondaryColor
-                        font.pixelSize: NeonStyle.fontCaption
+                        font.pixelSize: 12
                         font.bold: true
                         Layout.alignment: Qt.AlignHCenter
                     }
                     Text {
-                        text: (backend.dailySummary.vat || 0).toFixed(3) + " TND"
+                        text: ((posBackend && posBackend.dailySummary) ? (posBackend.dailySummary.vat || 0).toFixed(3) : "0.000") + " TND"
                         color: NeonStyle.greenColor
-                        font.pixelSize: NeonStyle.fontHeader
+                        font.pixelSize: 28
                         font.bold: true
                         Layout.alignment: Qt.AlignHCenter
                     }
@@ -118,7 +118,8 @@ Rectangle {
         NeonCard {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            glowColor: NeonStyle.goldGlow
+            hasShadow: true
+            padding: NeonStyle.spaceL
             
             ColumnLayout {
                 anchors.fill: parent
@@ -127,35 +128,36 @@ Rectangle {
                 RowLayout {
                     Text {
                         text: "LOW STOCK ALERTS"
-                        color: NeonStyle.goldColor
-                        font.pixelSize: NeonStyle.fontTitle
+                        color: NeonStyle.textColor
+                        font.pixelSize: 20
                         font.bold: true
                     }
                     Item { Layout.fillWidth: true }
-                    Text {
-                        text: "Action Required"
-                        color: NeonStyle.errorColor
-                        font.pixelSize: NeonStyle.fontCaption
-                        font.bold: true
+                    Rectangle {
+                        width: 120; height: 30; radius: 15; color: NeonStyle.errorColor + "15"
+                        Text { anchors.centerIn: parent; text: "Action Required"; color: NeonStyle.errorColor; font.bold: true; font.pixelSize: 12 }
                     }
                 }
                 
                 ListView {
+                    id: stockList
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     clip: true
-                    model: backend.productsModel.filter(p => p.stock <= 5)
-                    spacing: NeonStyle.spaceS
+                    model: (posBackend && posBackend.productsModel) ? posBackend.productsModel : []
+                    spacing: 12
                     
                     delegate: Rectangle {
-                        width: parent.width
-                        height: 40
-                        color: NeonStyle.surfaceElevated
-                        radius: NeonStyle.radiusS
+                        width: stockList.width
+                        height: modelData.stock <= 5 ? 50 : 0
+                        visible: modelData.stock <= 5
+                        color: NeonStyle.surfaceLightColor
+                        radius: 8
                         
                         RowLayout {
                             anchors.fill: parent
-                            anchors.margins: NeonStyle.spaceM
+                            anchors.margins: 15
+                            visible: parent.visible
                             Text {
                                 text: modelData.name
                                 color: NeonStyle.textColor
@@ -174,7 +176,7 @@ Rectangle {
                         anchors.centerIn: parent
                         text: "All stock levels are healthy!"
                         color: NeonStyle.textMuted
-                        visible: parent.count === 0
+                        visible: stockList.count === 0 || !posBackend.productsModel.some(p => p.stock <= 5)
                     }
                 }
             }
