@@ -4,6 +4,8 @@ __pycache__/
 .DS_Store
 .pio/
 buildroot/output/
-db/*.sqlite
+db/*.db
+db/*.db-shm
+db/*.db-wal
 receipts/
 scratch/

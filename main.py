@@ -1,15 +1,21 @@
 import sys
 import os
 import json
+import datetime
+import subprocess
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
-from PySide6.QtCore import QObject, Property, Signal, Slot, QTimer
+from PySide6.QtCore import QObject, Property, Signal, Slot, QTimer, QThread, Qt
 
-from app.database import Database
+# Local imports
+from app.database import Database, DatabaseManager
 from app.compliance import Compliance
 from app.hardware.scanner import Scanner
 from app.hardware.printer import ThermalPrinter
 
+# ══════════════════════════════════════════════════════════════════════════════
+# MAIN BACKEND CONTROLLER
+# ══════════════════════════════════════════════════════════════════════════════
 class POSBackend(QObject):
     dataChanged = Signal()
     currentViewChanged = Signal()
@@ -19,12 +25,41 @@ class POSBackend(QObject):
     dailySummaryChanged = Signal(dict)
     settingsChanged = Signal(dict)
     
+    # Error & Status Signals
+    errorMessage = Signal(str)
+    printerStatusMessage = Signal(str)
+    printerOnline = Signal(bool)
+    printersFound = Signal(list)
+    
+    # Internal Signals
+    request_print = Signal(dict, list)
+    
     def __init__(self):
         super().__init__()
-        self.db = Database.getInstance()
-        self.printer = ThermalPrinter()
-        self.scanner = Scanner()
         
+        # 1. Initialize Threaded Managers
+        try:
+            self.db_manager = DatabaseManager()
+            self.printer_manager = ThermalPrinter(self.db_manager)
+            self.scanner = Scanner()
+        except Exception as e:
+            print(f"Startup Error: {e}")
+            sys.exit(1)
+        
+        # 2. Connect Printer Worker Signals
+        self.printer_worker = self.printer_manager.worker
+        self.request_print.connect(self.printer_worker.do_print)
+        self.printer_worker.printerStatusChanged.connect(self.printerStatusMessage.emit)
+        self.printer_worker.printerConnected.connect(self._on_printer_status)
+        self.printer_worker.printerDiscovered.connect(self.printersFound.emit)
+        self.printer_worker.printError.connect(self.errorMessage.emit)
+
+        # 3. Timers
+        self.memory_timer = QTimer()
+        self.memory_timer.timeout.connect(self._check_memory)
+        self.memory_timer.start(60000)
+
+        # 4. State
         self._currentView = "sales"
         self._cart = []
         self._total = 0.0
@@ -33,319 +68,210 @@ class POSBackend(QObject):
         self._selectedCategory = 0
         self._settings = {}
         self._dailySummary = {"date": "", "count": 0, "revenue": 0, "vat": 0}
+        self._printer_status = False
         
-        self._load_settings()
-        self._refresh_data()
+        # 5. Connect Database Signals
+        self.db_manager.productsModelChanged.connect(self._on_products_loaded, Qt.QueuedConnection)
+        self.db_manager.categoriesModelChanged.connect(self._on_categories_loaded, Qt.QueuedConnection)
+        self.db_manager.dailySummaryChanged.connect(self._on_summary_loaded, Qt.QueuedConnection)
+        self.db_manager.settingsLoaded.connect(self._on_settings_loaded, Qt.QueuedConnection)
         
-    def _refresh_data(self):
-        self._products = [dict(r) for r in self.db.get_products(self._selectedCategory)]
-        self._categoriesList = [dict(r) for r in self.db.get_categories()]
+        # 6. Connect Scanner
+        self.scanner.barcode_received.connect(self._on_barcode_scanned)
+        
+        self.db_manager.requestLoadSettings.emit()
+        self.refreshInventory()
+        
+    @Property(bool, notify=dataChanged)
+    def isPrinterOnline(self): return self._printer_status
+
+    def _on_printer_status(self, online):
+        self._printer_status = online
+        self.printerOnline.emit(online)
         self.dataChanged.emit()
 
-    # Properties
+    def _check_memory(self):
+        try:
+            import psutil
+            process = psutil.Process(os.getpid())
+            mem_mb = process.memory_info().rss / (1024 * 1024)
+            if mem_mb > 400:
+                self.errorMessage.emit("Memory Usage High. Optimizing resources...")
+        except ImportError: pass
+
+    # --- DATA SYNC SLOTS ---
+    def _on_products_loaded(self, data):
+        self._products = data[:50]
+        self.productsModelChanged.emit(self._products)
+        self.dataChanged.emit()
+
+    def _on_categories_loaded(self, data):
+        self._categoriesList = data
+        self.categoriesModelChanged.emit(data)
+        self.dataChanged.emit()
+
+    def _on_summary_loaded(self, data):
+        self._dailySummary = data
+        self.dailySummaryChanged.emit(data)
+
+    def _on_settings_loaded(self, data):
+        self._settings = data
+        self.settingsChanged.emit(data)
+
+    def _on_barcode_scanned(self, barcode):
+        product = next((p for p in self._products if p.get('barcode') == barcode), None)
+        if product: self.addToCart(product['id'])
+
+    # --- PROPERTIES ---
     @Property(str, notify=currentViewChanged)
     def currentView(self): return self._currentView
-
     @Property(list, notify=dataChanged)
     def cart(self): return self._cart
-
     @Property(float, notify=dataChanged)
     def total(self): return self._total
-
     @Property(list, notify=dataChanged)
-    def products(self): return self._products
-
+    def productsModel(self): return self._products
     @Property(list, notify=dataChanged)
-    def categoriesList(self): return self._categoriesList
-
-    @Property(int, notify=dataChanged)
-    def selectedCategory(self): return self._selectedCategory
-
+    def categoriesModel(self): return self._categoriesList
     @Property(dict, notify=dailySummaryChanged)
     def dailySummary(self): return self._dailySummary
-
     @Property(dict, notify=settingsChanged)
     def settings(self): return self._settings
 
-    @Property(list, notify=dataChanged)
-    def productsModel(self): return self._products
-
-    @Property(list, notify=dataChanged)
-    def categoriesModel(self): return self._categoriesList
-        
-    def _load_settings(self):
-        try:
-            rows = self.db.query("SELECT key, value FROM settings")
-            if rows:
-                self._settings = {r['key']: r['value'] for r in rows}
-            else:
-                self._settings = {
-                    "store_name": "My Store",
-                    "store_tax_id": "TN123456",
-                    "receipt_title": "ANTIGRAVITY POS",
-                    "tax_rate": "19",
-                    "currency": "TND",
-                    "low_stock_threshold": "5"
-                }
-            self.settingsChanged.emit(self._settings)
-        except Exception as e:
-            print(f"Error loading settings: {e}")
-    
-    @Slot()
-    def loadSettings(self):
-        self._load_settings()
-        
-    @Slot(str, str)
-    def saveSetting(self, key, value):
-        self.db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
-        self._load_settings()
-
-    @Slot(dict)
-    def saveSettings(self, settings):
-        for key, value in settings.items():
-            self.db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, str(value)))
-        self._load_settings()
-        
-    @Slot()
-    def request_daily_summary(self):
-        try:
-            rows = self.db.query("""SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as revenue, COALESCE(SUM(tax), 0) as vat, DATE(created_at, 'localtime') as date FROM invoices WHERE DATE(created_at, 'localtime') = DATE('now', 'localtime')""")
-            if rows and rows[0]['count'] > 0:
-                self._dailySummary = dict(rows[0])
-            else:
-                from datetime import date
-                self._dailySummary = {"date": str(date.today()), "count": 0, "revenue": 0, "vat": 0}
-        except Exception as e:
-            from datetime import date
-            self._dailySummary = {"date": str(date.today()), "count": 0, "revenue": 0, "vat": 0}
-        self.dailySummaryChanged.emit(self._dailySummary)
-
-    # Slots
+    # --- UI SLOTS ---
     @Slot(str)
     def changeView(self, view):
         self._currentView = view
-        self.scanner.set_enabled(view == "sales")
+        self.scanner.request_set_enabled.emit(view == "sales")
         self.currentViewChanged.emit()
+
+    @Slot()
+    def scanPrinters(self):
+        self.printer_worker.scan_printers()
+
+    @Slot(str, str)
+    def connectPrinter(self, address, p_type):
+        self.printer_worker.connect_printer(address, p_type)
+
+    @Slot()
+    def refreshInventory(self):
+        try:
+            self.db_manager.requestLoadProducts.emit(self._selectedCategory)
+            self.db_manager.requestLoadCategories.emit()
+        except Exception as e:
+            self.errorMessage.emit(f"Database error: {e}")
 
     @Slot(int)
     def filterByCategory(self, cat_id):
         self._selectedCategory = cat_id
-        self._refresh_data()
-
-    @Slot(int)
-    def filterInventory(self, cat_id):
-        self._selectedCategory = cat_id
-        self._refresh_data()
-
-    @Slot()
-    def refreshInventory(self):
-        self._refresh_data()
+        self.db_manager.requestLoadProducts.emit(cat_id)
 
     @Slot(int)
     def addToCart(self, product_id):
         product = next((p for p in self._products if p['id'] == product_id), None)
         if product:
             existing = next((item for item in self._cart if item['id'] == product_id), None)
-            if existing:
-                existing['quantity'] += 1
+            if existing: existing['quantity'] += 1
             else:
-                self._cart.append({
-                    "id": product['id'],
-                    "name": product['name'],
-                    "price": float(product['price']),
-                    "quantity": 1
-                })
+                self._cart.append({"id": product['id'], "name": product['name'], "price": float(product['price']), "quantity": 1})
             self._update_total()
 
-    @Slot(int)
-    def removeFromCart(self, index):
-        if 0 <= index < len(self._cart):
-            del self._cart[index]
-            self._update_total()
-
-    @Slot(str)
-    def searchProducts(self, query):
-        if not query or len(query) < 2:
-            self._refresh_data()
-            return
-        self._products = [dict(r) for r in self.db.search_products(query)]
+    def _update_total(self):
+        self._total = sum((item.get('price', 0) * item.get('quantity', 1)) for item in self._cart)
         self.dataChanged.emit()
-
-    @Slot()
-    def clearCart(self):
-        self._cart = []
-        self._update_total()
 
     @Slot()
     def checkout(self):
         if not self._cart: return
-        
-        tax_rate = float(self._settings.get("tax_rate", 19))
-        iid = Compliance.get_next_iid()
-        total = self._total
-        tax = round(total * (tax_rate / 100), 3)
-        qr_data = Compliance.generate_qr_data(iid, total, tax)
-        
-        success = Compliance.save_invoice(iid, total, tax, qr_data, self._cart)
-        
-        if success:
-            invoice_data = {"iid": iid, "total": total, "tax": tax, "qr_data": qr_data}
-            self.printer.print_receipt(invoice_data, self._cart)
-            self.clearCart()
-            self._refresh_data()
+        try:
+            tax_rate = float(self._settings.get("tax_rate", 19))
+            iid = Compliance.get_next_iid()
+            total = self._total
+            tax = round(total * (tax_rate / 100), 3)
+            qr_data = Compliance.generate_qr_data(iid, total, tax)
+            self.db_manager.requestRecordSale.emit(self._cart, iid, qr_data, total, tax)
+            self.request_print.emit({"iid": iid, "total": total, "tax": tax, "qr_data": qr_data}, list(self._cart))
+            self._cart = []
+            self._update_total()
+            self.refreshInventory()
+            self.request_daily_summary()
+        except Exception as e:
+            self.errorMessage.emit(f"Checkout failed: {e}")
+
+    @Slot()
+    def request_daily_summary(self):
+        self.db_manager.requestGetDailySummary.emit()
+
+    @Slot(dict)
+    def saveSettings(self, settings):
+        try:
+            for k, v in settings.items():
+                self.db_manager.requestSaveSetting.emit(k, str(v))
+        except Exception as e:
+            self.errorMessage.emit(f"Failed to save settings: {e}")
 
     @Slot(str, str, float, int, int)
     def addProduct(self, name, barcode, price, stock, cat_id):
-        try:
-            self.db.execute(
-                "INSERT INTO products (name, barcode, price, stock, category_id) VALUES (?, ?, ?, ?, ?)",
-                (name, barcode, float(price or 0), int(stock or 0), cat_id)
-            )
-            self._refresh_data()
-        except Exception as e:
-            print(f"Error adding product: {e}")
-
-    def _update_total(self):
-        self._total = sum(
-            (item.get('price') or 0.0) * (item.get('quantity') or 1)
-            for item in self._cart
-        )
-        self.dataChanged.emit()
+        self.db_manager.requestAddProduct.emit(name, barcode, price, stock, cat_id, 5)
 
     @Slot(int)
-    def deleteProduct(self, product_id):
-        self.db.execute("DELETE FROM products WHERE id = ?", (product_id,))
-        self._refresh_data()
+    def deleteProduct(self, pid):
+        self.db_manager.requestDeleteProduct.emit(pid)
 
     @Slot(int, str, str, float, int, int)
-    def updateProduct(self, product_id, name, barcode, price, stock, cat_id):
-        try:
-            self.db.execute(
-                "UPDATE products SET name=?, barcode=?, price=?, stock=?, category_id=? WHERE id=?",
-                (name, barcode, float(price or 0), int(stock or 0), cat_id, product_id)
-            )
-            self._refresh_data()
-        except Exception as e:
-            print(f"Error updating product: {e}")
-
-    @Slot(str)
-    def addCategory(self, name):
-        try:
-            self.db.execute("INSERT OR IGNORE INTO categories (name) VALUES (?)", (name,))
-            self._refresh_data()
-        except Exception as e:
-            print(f"Error adding category: {e}")
-
-    @Slot(int, int)
-    def cartItemQuantity(self, index, delta):
-        if 0 <= index < len(self._cart):
-            item = self._cart[index]
-            new_qty = item.get('quantity', 1) + delta
-            if new_qty <= 0:
-                del self._cart[index]
-            else:
-                item['quantity'] = new_qty
-            self._update_total()
+    def updateProduct(self, pid, name, barcode, price, stock, cat_id):
+        self.db_manager.requestUpdateProduct.emit(pid, name, barcode, price, stock, cat_id, 5)
 
     @Slot(int)
     def cartItemIncrement(self, index):
-        self.cartItemQuantity(index, 1)
+        if 0 <= index < len(self._cart):
+            self._cart[index]['quantity'] += 1
+            self._update_total()
 
     @Slot(int)
     def cartItemDecrement(self, index):
-        self.cartItemQuantity(index, -1)
+        if 0 <= index < len(self._cart):
+            self._cart[index]['quantity'] -= 1
+            if self._cart[index]['quantity'] <= 0: del self._cart[index]
+            self._update_total()
 
-    @Slot(str)
-    def searchInvoices(self, iid):
-        rows = self.db.query("SELECT * FROM invoices WHERE iid = ?", (iid,))
-        return rows[0] if rows else None
-
-    # Aliases for compatibility
-    @Slot(int)
-    def add_to_cart(self, product_id): self.addToCart(product_id)
-    
-    @Slot(int)
-    def remove_from_cart(self, product_id):
-        for i, item in enumerate(self._cart):
-            if item['id'] == product_id:
-                del self._cart[i]
-                break
-        self._update_total()
-
-    @Slot()
-    def clear_cart(self): self.clearCart()
-    
-    @Slot(str)
-    def search_product(self, query): self.searchProducts(query)
-
-    @Slot()
-    def generateBarcode(self):
-        import random
-        return "".join([str(random.randint(0, 9)) for _ in range(13)])
-
-    @Slot(str)
+    @Slot(dict)
     def print_z_report(self, summary):
-        import datetime, sys, traceback
         try:
-            if not isinstance(summary, dict):
-                summary = {}
-            
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            receipts_dir = os.path.join(base_dir, "receipts")
-            os.makedirs(receipts_dir, exist_ok=True)
-            
+            base_dir = os.path.expanduser("~") if sys.platform == "linux" else os.path.dirname(os.path.abspath(__file__))
+            reports_dir = os.path.join(base_dir, "reports") if sys.platform == "linux" else os.path.join(base_dir, "receipts")
+            os.makedirs(reports_dir, exist_ok=True)
             date_str = summary.get('date', 'today')
-            filename = os.path.join(receipts_dir, f"Z_REPORT_{date_str}.txt")
-            
-            lines = [
-                "    DAILY Z-REPORT",
-                "=" * 30,
-                f"Date: {summary.get('date', 'N/A')}",
-                "-" * 30,
-                f"Transactions: {summary.get('count', 0)}",
-                f"Revenue: {float(summary.get('revenue', 0)):.3f} TND",
-                f"VAT Collected: {float(summary.get('vat', 0)):.3f} TND",
-                "-" * 30,
-                f"Total: {float(summary.get('revenue', 0)):.3f} TND",
-                "=" * 30,
-                datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            ]
-            
-            with open(filename, "w") as f:
-                f.write("\n".join(lines))
-            
-            import subprocess
-            if sys.platform == "darwin":
-                subprocess.Popen(['open', filename])
-            elif sys.platform == "win32":
-                os.startfile(filename)
-            else:
-                subprocess.Popen(['xdg-open', filename])
-                
+            filename = os.path.join(reports_dir, f"Z_REPORT_{date_str}.txt")
+            content = f"    DAILY Z-REPORT\n" + "="*27 + f"\nDate: {date_str}\nTransactions: {summary.get('count', 0)}\nRevenue: {float(summary.get('revenue', 0)):.3f} TND\nVAT: {float(summary.get('vat', 0)):.3f} TND\n" + "="*27 + "\n"
+            with open(filename, "w") as f: f.write(content)
+
+            if sys.platform == "linux":
+                if self.isPrinterOnline:
+                    self.request_print.emit({"iid": "Z-REPORT", "total": summary.get('revenue', 0), "qr_data": ""}, [{"name": "DAILY REVENUE", "price": summary.get('revenue', 0), "quantity": 1}])
+                else: self.errorMessage.emit(f"Report saved to {filename}")
+            elif sys.platform == "darwin": subprocess.Popen(["open", filename])
+            elif sys.platform == "win32": os.startfile(filename)
         except Exception as e:
-            print("Error printing Z-Report:", e)
-            traceback.print_exc()
+            self.errorMessage.emit(f"Z-Report Error: {e}")
+
+    def shutdown(self):
+        self.memory_timer.stop()
+        self.scanner.stop()
+        self.printer_manager.stop()
+        self.db_manager.thread.quit()
+        self.db_manager.thread.wait()
 
 if __name__ == "__main__":
+    QGuiApplication.setAttribute(Qt.AA_EnableHighDpiScaling, False)
     app = QGuiApplication(sys.argv)
     os.environ["QT_QUICK_CONTROLS_STYLE"] = "Basic"
-    
     backend = POSBackend()
     engine = QQmlApplicationEngine()
-    
-    engine.rootContext().setContextProperty("backend", backend)
     engine.rootContext().setContextProperty("posBackend", backend)
-    
     qml_file = os.path.join(os.path.dirname(__file__), "ui/main.qml")
     engine.load(qml_file)
-    
-    if not engine.rootObjects():
-        print("Error: QML engine failed to load root objects.")
-        sys.exit(-1)
-        
+    if not engine.rootObjects(): sys.exit(-1)
     exit_code = app.exec()
-    if hasattr(backend, 'scanner'):
-        try: backend.scanner.stop()
-        except: pass
-            
+    backend.shutdown()
     sys.exit(exit_code)

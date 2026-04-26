@@ -1,3 +1,6 @@
-pyside6
+PySide6
 qrcode
 pillow
+bleak
+python-escpos
+psutil

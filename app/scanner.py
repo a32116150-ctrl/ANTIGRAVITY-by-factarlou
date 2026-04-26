@@ -1,14 +1,23 @@
-from PySide6.QtCore import QObject, Signal, Slot
+Refactor scanner.py to use QThread worker pattern:
 
-class ScannerManager(QObject):
+from PySide6.QtCore import QObject, Signal, Slot, QThread
+
+class ScannerWorker(QObject):
     barcodeScanned = Signal(str)
-
-    def __init__(self):
-        super().__init__()
-        print("ScannerManager: Simulated Scanner (macOS)")
-
+    
     @Slot(str)
     def simulate_scan(self, barcode):
-        """Allows manual simulation from UI"""
-        print(f"ScannerManager: Scanned -> {barcode}")
+        print(f"Scanner: {barcode}")
         self.barcodeScanned.emit(barcode)
+
+class ScannerManager(QObject):
+    def __init__(self):
+        super().__init__()
+        self.thread = QThread()
+        self.worker = ScannerWorker()
+        self.worker.moveToThread(self.thread)
+        self.thread.start()
+    
+    def shutdown(self):
+        self.thread.quit()
+        self.thread.wait(2000)
