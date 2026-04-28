@@ -3,6 +3,10 @@
 APP_DIR="/opt/antigravity"
 SERVICE_FILE="/etc/systemd/system/antigravity.service"
 
+echo "Extracting app files..."
+python3 -m zipfile -e "/tmp/app.zip" "${APP_DIR}"
+rm -f "/tmp/app.zip"
+
 echo "Setting up Python virtual environment..."
 python3 -m venv "${APP_DIR}/.venv"
 "${APP_DIR}/.venv/bin/pip" install --upgrade pip

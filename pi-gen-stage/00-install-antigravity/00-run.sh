@@ -10,5 +10,4 @@ REPO="a32116150-ctrl/ANTIGRAVITY-by-factarlou"
 echo "Downloading release ${TAG} from ${REPO}..."
 curl -L --fail "https://github.com/${REPO}/releases/download/${TAG}/antigravity_pos_${TAG}_app.zip" -o "${ROOTFS_DIR}/tmp/app.zip"
 
-python3 -m zipfile -e "${ROOTFS_DIR}/tmp/app.zip" "${APP_DIR}"
-rm -f "${ROOTFS_DIR}/tmp/app.zip"
+
