@@ -33,6 +33,7 @@ class POSBackend(QObject):
     
     # Internal Signals
     request_print = Signal(dict, list)
+    request_scan_printers = Signal()  # Triggers BT/WiFi scan on worker thread
     
     def __init__(self):
         super().__init__()
@@ -49,6 +50,7 @@ class POSBackend(QObject):
         # 2. Connect Printer Worker Signals
         self.printer_worker = self.printer_manager.worker
         self.request_print.connect(self.printer_worker.do_print)
+        self.request_scan_printers.connect(self.printer_worker.scan_printers)  # Thread-safe
         self.printer_worker.printerStatusChanged.connect(self.printerStatusMessage.emit)
         self.printer_worker.printerConnected.connect(self._on_printer_status)
         self.printer_worker.printerDiscovered.connect(self.printersFound.emit)
@@ -147,7 +149,9 @@ class POSBackend(QObject):
 
     @Slot()
     def scanPrinters(self):
-        self.printer_worker.scan_printers()
+        # Emit a signal so the scan runs on the printer's background thread,
+        # NOT on the main/UI thread (prevents 30-60 second UI freeze).
+        self.request_scan_printers.emit()
 
     @Slot(str, str)
     def connectPrinter(self, address, p_type):

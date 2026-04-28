@@ -1,11 +1,46 @@
+# Python
 .venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# macOS
 .DS_Store
+.AppleDouble
+
+# PlatformIO
 .pio/
+
+# Buildroot
 buildroot/output/
+buildroot_src/
+
+# Database
 db/*.db
 db/*.db-shm
 db/*.db-wal
+
+# Receipts & Reports
 receipts/
+reports/
+
+# Scratch / dev files
 scratch/
+
+# Release artifacts
+release_assets/
+*.img
+*.zip
+
+# Logs
+*.log
+build.log
+
+# IDE
+.vscode/
+.idea/
+*.swp

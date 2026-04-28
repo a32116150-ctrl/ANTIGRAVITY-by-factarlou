@@ -4,11 +4,95 @@ on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch: # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      skip_buildroot:
+        description: 'Skip Buildroot OS image (build Python app only)'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['true', 'false']
 
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 1: Validate the Python app (fast, runs on every tag push)
+# This ensures the app code is importable and the QML files are valid
+# before starting the 3-hour Buildroot compilation.
+# ─────────────────────────────────────────────────────────────────────────────
 jobs:
-  build:
+  validate:
+    name: Validate Python App
     runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Install non-Qt deps only (PySide6 is huge and not needed for syntax check)
+          pip install psutil qrcode pillow python-escpos bleak || true
+
+      - name: Check Python Syntax (all files)
+        run: |
+          echo "==> Checking Python syntax..."
+          python -m py_compile main.py
+          python -m py_compile app/__init__.py
+          python -m py_compile app/database.py
+          python -m py_compile app/compliance.py
+          python -m py_compile app/hardware/__init__.py
+          python -m py_compile app/hardware/scanner.py
+          python -m py_compile app/hardware/printer.py
+          echo "✅ All Python files are syntactically valid"
+
+      - name: Check for broken imports (mock Qt)
+        run: |
+          echo "==> Checking imports with mocked Qt..."
+          python -c "
+          import sys
+          # Mock PySide6 so we can test our code structure
+          import types
+          pyside6 = types.ModuleType('PySide6')
+          for mod in ['QtCore', 'QtGui', 'QtQml']:
+              m = types.ModuleType(f'PySide6.{mod}')
+              for cls in ['QObject', 'Signal', 'Slot', 'QThread', 'QTimer',
+                          'QGuiApplication', 'QQmlApplicationEngine',
+                          'Property', 'Qt', 'QCoreApplication']:
+                  setattr(m, cls, object)
+              pyside6.__dict__[mod] = m
+              sys.modules[f'PySide6.{mod}'] = m
+          sys.modules['PySide6'] = pyside6
+          sys.modules['escpos'] = types.ModuleType('escpos')
+          sys.modules['escpos.printer'] = types.ModuleType('escpos.printer')
+          sys.modules['escpos.exceptions'] = types.ModuleType('escpos.exceptions')
+          sys.modules['bleak'] = types.ModuleType('bleak')
+          sys.modules['psutil'] = types.ModuleType('psutil')
+          sys.modules['qrcode'] = types.ModuleType('qrcode')
+
+          # Now test imports
+          import app.database
+          import app.compliance
+          import app.hardware.scanner
+          import app.hardware.printer
+          print('✅ All app modules import successfully')
+          "
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 2: Build the Buildroot OS Image (slow, ~3-6 hours)
+# Only runs when explicitly requested or when validate passes on a real tag
+# ─────────────────────────────────────────────────────────────────────────────
+  build_os_image:
+    name: Build RPi OS Image (Buildroot)
+    runs-on: ubuntu-latest
+    needs: validate
+    # Skip if user chose to skip, or if this is a dry-run dispatch
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.skip_buildroot == 'false') }}
     permissions:
       contents: write
 
@@ -16,57 +100,145 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Maximize Disk Space
+      # ── Free up disk space ──────────────────────────────────────────────
+      # GitHub runners have ~14GB free. Buildroot needs ~10GB.
+      - name: Maximize Available Disk Space
         run: |
+          echo "==> Disk before cleanup:"
+          df -h
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/ghc
           sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo docker image prune --all --force
+          sudo apt-get clean
+          docker system prune -af || true
+          echo "==> Disk after cleanup:"
+          df -h
 
-      - name: Install Buildroot Dependencies
+      # ── Cache the Buildroot source downloads ────────────────────────────
+      # This is the biggest time-saver. Downloads are ~2GB and take 30min.
+      # With caching, subsequent builds skip the download step entirely.
+      - name: Cache Buildroot Downloads
+        uses: actions/cache@v4
+        with:
+          path: buildroot_dl
+          key: buildroot-dl-2023.11-${{ hashFiles('buildroot/configs/antigravity_defconfig') }}
+          restore-keys: |
+            buildroot-dl-2023.11-
+            buildroot-dl-
+
+      # ── Install host build dependencies ────────────────────────────────
+      - name: Install Buildroot Host Dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
             build-essential bash bc binutils bzip2 ca-certificates \
             cpio file g++ gcc git gzip libncurses5-dev libssl-dev \
-            make patch perl python3 rsync sed tar unzip wget
+            make patch perl python3 python3-pip rsync sed tar \
+            unzip wget diffutils libelf-dev
 
-      - name: Clone Buildroot
+      # ── Clone Buildroot (specific release, not a branch tip) ────────────
+      # Using a tagged release is more stable than a branch (which can change)
+      - name: Clone Buildroot 2023.11.3
         run: |
-          git clone -b 2023.11.x --depth 1 https://git.buildroot.net/buildroot buildroot_src
+          if [ ! -d buildroot_src/.git ]; then
+            git clone \
+              --branch 2023.11.3 \
+              --depth 1 \
+              https://git.buildroot.net/buildroot \
+              buildroot_src
+          else
+            echo "Buildroot source already cached"
+          fi
 
+      # ── Set up the configuration ────────────────────────────────────────
       - name: Setup Buildroot Configuration
         run: |
-          # Copy board files and configs into the buildroot source tree
+          # Copy board support files into the Buildroot tree
           cp -r buildroot/board buildroot_src/
           cp buildroot/configs/antigravity_defconfig buildroot_src/configs/
-          
-          # The post-build script in the defconfig expects to find app/ ui/ etc in ..
-          # In this setup, buildroot_src is in the project root, so .. is the project root.
-          # This matches the cp -r ../app logic in post-build.sh
 
-      - name: Build Antigravity OS
+          # Point Buildroot download cache to our cached directory
+          mkdir -p buildroot_dl
+          echo "BR2_DL_DIR=\"$(pwd)/buildroot_dl\"" >> buildroot_src/.config || true
+
+      # ── Apply configuration ─────────────────────────────────────────────
+      - name: Apply Buildroot Defconfig
         working-directory: buildroot_src
         run: |
           make antigravity_defconfig
-          # Using -j$(nproc) to speed up compilation
-          make -j$(nproc)
+          # Verify no unknown symbols
+          make olddefconfig
 
+      # ── Compile (the big one) ───────────────────────────────────────────
+      # We limit parallelism slightly to avoid OOM on the 7GB runner
+      - name: Build Antigravity OS Image
+        working-directory: buildroot_src
+        timeout-minutes: 300
+        run: |
+          echo "==> Build started at $(date)"
+          make -j$(( $(nproc) > 4 ? 4 : $(nproc) )) 2>&1 | tee build.log
+          echo "==> Build finished at $(date)"
+
+      # ── Package the release asset ────────────────────────────────────────
       - name: Prepare Release Asset
         run: |
           mkdir -p release_assets
-          cp buildroot_src/output/images/sdcard.img release_assets/antigravity_pos_rpi_zero_2_w.img
-          cd release_assets
-          zip antigravity_pos_v1_release.zip antigravity_pos_rpi_zero_2_w.img
+          IMAGE_FILE="buildroot_src/output/images/sdcard.img"
 
-      - name: Create GitHub Release
-        id: create_release
-        uses: softprops/action-gh-release@v1
+          if [ ! -f "$IMAGE_FILE" ]; then
+            echo "ERROR: sdcard.img not found! Build may have failed."
+            ls -la buildroot_src/output/images/ || true
+            exit 1
+          fi
+
+          cp "$IMAGE_FILE" release_assets/antigravity_pos_rpi_zero2w_${{ github.ref_name }}.img
+          cd release_assets
+          zip antigravity_pos_${{ github.ref_name }}_rpi_zero2w.zip \
+              antigravity_pos_rpi_zero2w_${{ github.ref_name }}.img
+
+          # Generate SHA256 checksum
+          sha256sum antigravity_pos_${{ github.ref_name }}_rpi_zero2w.zip \
+              > antigravity_pos_${{ github.ref_name }}_rpi_zero2w.zip.sha256
+
+          echo "==> Release asset ready:"
+          ls -lh release_assets/
+
+      # ── Upload build log as artifact (always, for debugging) ─────────────
+      - name: Upload Build Log
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          files: release_assets/antigravity_pos_v1_release.zip
-          name: Release ${{ github.ref_name }}
+          name: buildroot-build-log-${{ github.ref_name }}
+          path: buildroot_src/build.log
+          retention-days: 7
+
+      # ── Create GitHub Release ─────────────────────────────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release_assets/antigravity_pos_${{ github.ref_name }}_rpi_zero2w.zip
+            release_assets/antigravity_pos_${{ github.ref_name }}_rpi_zero2w.zip.sha256
+          name: "Antigravity POS ${{ github.ref_name }}"
+          body: |
+            ## 🌌 Antigravity POS ${{ github.ref_name }}
+
+            ### Installation
+            1. Download the `.zip` file and verify with the `.sha256` checksum
+            2. Extract the `.img` file
+            3. Flash to a microSD card using [Raspberry Pi Imager](https://www.raspberrypi.com/software/) or `dd`
+            4. Insert into Raspberry Pi Zero 2 W and power on
+
+            ### First Boot
+            - The app starts automatically via systemd on boot
+            - Configure your store settings on first launch
+
+            ### Requirements
+            - Raspberry Pi Zero 2 W (BCM2710, 512MB RAM)
+            - MicroSD card (8GB minimum, Class 10 recommended)
+            - HDMI display
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -63,16 +63,21 @@ class DatabaseWorker(QObject):
         )""")
 
         default_settings = [
-            ("store_name",          "My Store"),
-            ("store_tax_id",        "TN123456"),
-            ("store_phone",         ""),
-            ("store_address",       ""),
-            ("receipt_title",       "ANTIGRAVITY POS"),
-            ("tax_rate",            "19"),
-            ("currency",            "TND"),
-            ("low_stock_threshold", "5"),
-            ("printer_enabled",     "true"),
-            ("scanner_enabled",     "true"),
+            ("store_name",              "My Store"),
+            ("store_tax_id",            ""),          # Set during initial configuration
+            ("store_phone",             ""),
+            ("store_address",           ""),
+            ("receipt_title",           "ANTIGRAVITY POS"),
+            ("tax_rate",                "0"),          # Set based on local tax law
+            ("currency",                "USD"),        # ISO 4217 currency code
+            ("currency_symbol",         "$"),          # Display symbol
+            ("low_stock_threshold",     "5"),
+            ("printer_enabled",         "true"),
+            ("scanner_enabled",         "true"),
+            ("compliance_url_template", ""),          # e.g. https://verify.example.com/?iid={iid}&total={total}
+            ("paper_width_mm",          "80"),         # 58 or 80
+            ("date_format",             "%Y-%m-%d"),   # ISO default; override per locale
+            ("decimal_separator",       "."),          # . or ,
         ]
         c.executemany(
             "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
