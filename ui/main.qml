@@ -10,7 +10,7 @@ ApplicationWindow {
     height: typeof screenHeight !== "undefined" ? screenHeight : 800
     minimumWidth: 1024
     minimumHeight: 700
-    title: "ANTIGRAVITY POS - Modern Edition"
+    title: "ANTIGRAVITY by factarlou"
     color: NeonStyle.backgroundColor
     visible: true
 
@@ -117,7 +117,7 @@ ApplicationWindow {
                     ColumnLayout {
                         spacing: 2
                         Text {
-                            text: "ANTIGRAVITY POS"
+                            text: "ANTIGRAVITY by factarlou"
                             color: NeonStyle.textSecondaryColor
                             font.pixelSize: 12
                             font.bold: true

@@ -139,6 +139,8 @@ class POSBackend(QObject):
     def dailySummary(self): return self._dailySummary
     @Property(dict, notify=settingsChanged)
     def settings(self): return self._settings
+    @Property(int, notify=dataChanged)
+    def selectedCategory(self): return self._selectedCategory
 
     # --- UI SLOTS ---
     @Slot(str)
@@ -165,6 +167,18 @@ class POSBackend(QObject):
         except Exception as e:
             self.errorMessage.emit(f"Database error: {e}")
 
+    @Slot(str)
+    def searchProducts(self, query):
+        """Filter products by name or barcode, updating the products model."""
+        if not query or not query.strip():
+            # Empty search → restore full list
+            self.db_manager.requestLoadProducts.emit(self._selectedCategory)
+            return
+        # Client-side filter from already-loaded products for instant response
+        q = query.lower()
+        filtered = [p for p in self._products if q in p.get('name', '').lower() or q in (p.get('barcode') or '').lower()]
+        self.productsModelChanged.emit(filtered)
+
     @Slot(int)
     def filterByCategory(self, cat_id):
         self._selectedCategory = cat_id
@@ -174,8 +188,17 @@ class POSBackend(QObject):
     def addToCart(self, product_id):
         product = next((p for p in self._products if p['id'] == product_id), None)
         if product:
+            # Check stock availability
             existing = next((item for item in self._cart if item['id'] == product_id), None)
-            if existing: existing['quantity'] += 1
+            current_in_cart = existing['quantity'] if existing else 0
+            available_stock = int(product.get('stock', 0))
+
+            if current_in_cart >= available_stock:
+                self.errorMessage.emit(f"⚠️ {product['name']}: only {available_stock} in stock")
+                return
+
+            if existing:
+                existing['quantity'] += 1
             else:
                 self._cart.append({"id": product['id'], "name": product['name'], "price": float(product['price']), "quantity": 1})
             self._update_total()
@@ -229,6 +252,14 @@ class POSBackend(QObject):
     @Slot(int)
     def cartItemIncrement(self, index):
         if 0 <= index < len(self._cart):
+            item = self._cart[index]
+            # Find the product to check available stock
+            product = next((p for p in self._products if p['id'] == item['id']), None)
+            if product:
+                available_stock = int(product.get('stock', 0))
+                if item['quantity'] >= available_stock:
+                    self.errorMessage.emit(f"⚠️ {item['name']}: only {available_stock} in stock")
+                    return
             self._cart[index]['quantity'] += 1
             self._update_total()
 
@@ -267,7 +298,7 @@ class POSBackend(QObject):
         self.db_manager.thread.wait()
 
 if __name__ == "__main__":
-    QGuiApplication.setAttribute(Qt.AA_EnableHighDpiScaling, False)
+    # Qt6: High-DPI scaling is always enabled — no attribute needed
     app = QGuiApplication(sys.argv)
     os.environ["QT_QUICK_CONTROLS_STYLE"] = "Basic"
     backend = POSBackend()

@@ -105,7 +105,7 @@ Rectangle {
                 }
             }
 
-            Rectangle { Layout.fillWidth: true; height: 1; anchors.bottom: parent.bottom; color: NeonStyle.borderColor }
+            Item { Layout.fillWidth: true; height: 1 }
         }
 
         // ── TAB CONTENT ──────────────────────────────────────────────────────
