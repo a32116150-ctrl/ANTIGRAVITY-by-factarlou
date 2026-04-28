@@ -216,33 +216,30 @@ Rectangle {
                     delegate: Rectangle {
                         required property var modelData
                         required property int index
-                        // Only show items with stock ≤ 5 (including negatives)
                         width: stockList.width
                         height: modelData.stock <= 5 ? 48 : 0
                         visible: modelData.stock <= 5
-                        color: modelData.stock <= 0
-                               ? NeonStyle.errorColor + "12"
-                               : NeonStyle.warningColor + "12"
+                        // Solid color — semi-transparent hex suffixes break in QML
+                        color: modelData.stock <= 0 ? NeonStyle.errorColor : "#D97706"
                         radius: NeonStyle.radiusS
 
                         RowLayout {
                             anchors.fill: parent
                             anchors.leftMargin: 16
                             anchors.rightMargin: 16
-                            anchors.topMargin: 0
-                            anchors.bottomMargin: 0
                             visible: parent.visible
                             spacing: NeonStyle.spaceM
 
                             // Status dot
                             Rectangle {
                                 width: 8; height: 8; radius: 4
-                                color: modelData.stock <= 0 ? NeonStyle.errorColor : NeonStyle.warningColor
+                                color: "white"
+                                opacity: 0.8
                             }
 
                             Text {
                                 text: modelData.name
-                                color: NeonStyle.textColor
+                                color: "white"
                                 font.bold: true
                                 font.pixelSize: 14
                                 Layout.fillWidth: true
@@ -253,9 +250,7 @@ Rectangle {
                                 width: stockBadge.implicitWidth + 20
                                 height: 26
                                 radius: 13
-                                color: modelData.stock <= 0
-                                       ? NeonStyle.errorColor + "20"
-                                       : NeonStyle.warningColor + "20"
+                                color: "#33ffffff"   // 20% white overlay
 
                                 Text {
                                     id: stockBadge
@@ -263,9 +258,7 @@ Rectangle {
                                     text: modelData.stock <= 0
                                           ? "OUT OF STOCK"
                                           : "Only " + modelData.stock + " left"
-                                    color: modelData.stock <= 0
-                                           ? NeonStyle.errorColor
-                                           : NeonStyle.warningColor
+                                    color: "white"
                                     font.bold: true
                                     font.pixelSize: 11
                                 }

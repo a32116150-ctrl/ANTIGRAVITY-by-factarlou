@@ -11,6 +11,7 @@ class DatabaseWorker(QObject):
     categoriesModelChanged = Signal(list)
     dailySummaryChanged   = Signal(dict)
     settingsLoaded        = Signal(dict)
+    recentInvoicesLoaded  = Signal(list)
     errorOccurred         = Signal(str)
 
     def __init__(self, db_path):
@@ -232,6 +233,23 @@ class DatabaseWorker(QObject):
         except Exception as e:
             self.errorOccurred.emit(str(e))
 
+    @Slot(int)
+    def loadRecentInvoices(self, limit=50):
+        """Return the most recent invoices for the Reports view."""
+        try:
+            c = self.conn.cursor()
+            c.execute("""
+                SELECT
+                    id, iid, total, tax,
+                    strftime('%Y-%m-%d %H:%M', created_at, 'localtime') AS created_at
+                FROM invoices
+                ORDER BY created_at DESC
+                LIMIT ?
+            """, (limit,))
+            self.recentInvoicesLoaded.emit([dict(r) for r in c.fetchall()])
+        except Exception as e:
+            self.errorOccurred.emit(str(e))
+
     # ── settings ──────────────────────────────────────────────────────────────
     @Slot()
     def load_settings(self):
@@ -265,6 +283,7 @@ class DatabaseManager(QObject):
     categoriesModelChanged = Signal(list)
     dailySummaryChanged   = Signal(dict)
     settingsLoaded        = Signal(dict)
+    recentInvoicesLoaded  = Signal(list)
 
     # inbound request signals (UI → worker)
     requestLoadProducts    = Signal(int)
@@ -278,6 +297,7 @@ class DatabaseManager(QObject):
     requestGetDailySummary = Signal()
     requestLoadSettings    = Signal()
     requestSaveSetting     = Signal(str, str)
+    requestLoadRecentInvoices = Signal(int)
 
     def __init__(self):
         super().__init__()
@@ -297,6 +317,7 @@ class DatabaseManager(QObject):
         self.worker.categoriesModelChanged.connect(self.categoriesModelChanged)
         self.worker.dailySummaryChanged.connect(self.dailySummaryChanged)
         self.worker.settingsLoaded.connect(self.settingsLoaded)
+        self.worker.recentInvoicesLoaded.connect(self.recentInvoicesLoaded)
         self.worker.errorOccurred.connect(
             lambda msg: print(f"[DB ERROR] {msg}")
         )
@@ -313,6 +334,7 @@ class DatabaseManager(QObject):
         self.requestGetDailySummary.connect(self.worker.get_daily_summary)
         self.requestLoadSettings.connect(self.worker.load_settings)
         self.requestSaveSetting.connect(self.worker.save_setting)
+        self.requestLoadRecentInvoices.connect(self.worker.loadRecentInvoices)
 
         self.thread.start()
 

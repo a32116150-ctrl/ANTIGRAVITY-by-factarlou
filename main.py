@@ -24,6 +24,7 @@ class POSBackend(QObject):
     cartUpdated = Signal()
     dailySummaryChanged = Signal(dict)
     settingsChanged = Signal(dict)
+    recentInvoicesChanged = Signal(list)
     
     # Error & Status Signals
     errorMessage = Signal(str)
@@ -71,12 +72,14 @@ class POSBackend(QObject):
         self._settings = {}
         self._dailySummary = {"date": "", "count": 0, "revenue": 0, "vat": 0}
         self._printer_status = False
+        self._recentInvoices = []
         
         # 5. Connect Database Signals
         self.db_manager.productsModelChanged.connect(self._on_products_loaded, Qt.QueuedConnection)
         self.db_manager.categoriesModelChanged.connect(self._on_categories_loaded, Qt.QueuedConnection)
         self.db_manager.dailySummaryChanged.connect(self._on_summary_loaded, Qt.QueuedConnection)
         self.db_manager.settingsLoaded.connect(self._on_settings_loaded, Qt.QueuedConnection)
+        self.db_manager.recentInvoicesLoaded.connect(self._on_invoices_loaded, Qt.QueuedConnection)
         
         # 6. Connect Scanner
         self.scanner.barcode_received.connect(self._on_barcode_scanned)
@@ -120,6 +123,10 @@ class POSBackend(QObject):
         self._settings = data
         self.settingsChanged.emit(data)
 
+    def _on_invoices_loaded(self, data):
+        self._recentInvoices = data
+        self.recentInvoicesChanged.emit(data)
+
     def _on_barcode_scanned(self, barcode):
         product = next((p for p in self._products if p.get('barcode') == barcode), None)
         if product: self.addToCart(product['id'])
@@ -141,6 +148,8 @@ class POSBackend(QObject):
     def settings(self): return self._settings
     @Property(int, notify=dataChanged)
     def selectedCategory(self): return self._selectedCategory
+    @Property(list, notify=recentInvoicesChanged)
+    def recentInvoices(self): return self._recentInvoices
 
     # --- UI SLOTS ---
     @Slot(str)
@@ -166,6 +175,10 @@ class POSBackend(QObject):
             self.db_manager.requestLoadCategories.emit()
         except Exception as e:
             self.errorMessage.emit(f"Database error: {e}")
+
+    @Slot()
+    def loadRecentInvoices(self):
+        self.db_manager.requestLoadRecentInvoices.emit(100)
 
     @Slot(str)
     def searchProducts(self, query):

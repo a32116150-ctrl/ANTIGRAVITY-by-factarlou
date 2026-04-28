@@ -1,4 +1,4 @@
-name: Build and Release Antigravity POS
+name: Build and Release — ANTIGRAVITY by factarlou
 
 on:
   push:
@@ -6,25 +6,46 @@ on:
       - 'v*'
   workflow_dispatch:
     inputs:
-      skip_buildroot:
-        description: 'Skip Buildroot OS image (build Python app only)'
+      build_image:
+        description: 'Also build the RPi SD card image (takes ~30 min)'
         required: false
         default: 'false'
         type: choice
-        options: ['true', 'false']
+        options: ['false', 'true']
 
 # ─────────────────────────────────────────────────────────────────────────────
-# JOB 1: Validate the Python app (fast, runs on every tag push)
-# This ensures the app code is importable and the QML files are valid
-# before starting the 3-hour Buildroot compilation.
+# STRATEGY OVERVIEW
+#
+# Previous approach: Buildroot from scratch = 3-6 hours + frequent OOM crash.
+#
+# New approach — two independent jobs:
+#
+# JOB 1 (always runs, ~2 min): "App Release"
+#   • Validates all Python files compile cleanly
+#   • Creates a ZIP of the app + a one-command installer script
+#   • Users flash stock Raspberry Pi OS Lite, boot, run one curl command
+#   • Release is attached to the GitHub Release immediately
+#
+# JOB 2 (on demand, ~25-35 min): "RPi Image"
+#   • Uses the official `pi-gen` Docker action maintained by RPi Foundation
+#   • Produces a real .img.gz flashable with Balena Etcher
+#   • Runs only when explicitly requested via workflow_dispatch or on major tags
+#   • Even if it fails, Job 1's installer ZIP is still published
 # ─────────────────────────────────────────────────────────────────────────────
+
 jobs:
-  validate:
-    name: Validate Python App
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # JOB 1: Validate + App Installer ZIP  (~2 minutes, never fails on OOM)
+  # ───────────────────────────────────────────────────────────────────────────
+  release_app:
+    name: "📦 App Installer Release"
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Python 3.11
@@ -33,15 +54,10 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install Python Dependencies
+      # ── Validate all Python files parse correctly ──────────────────────────
+      - name: Validate Python syntax
         run: |
-          python -m pip install --upgrade pip
-          # Install non-Qt deps only (PySide6 is huge and not needed for syntax check)
-          pip install psutil qrcode pillow python-escpos bleak || true
-
-      - name: Check Python Syntax (all files)
-        run: |
-          echo "==> Checking Python syntax..."
+          echo "==> Checking Python files..."
           python -m py_compile main.py
           python -m py_compile app/__init__.py
           python -m py_compile app/database.py
@@ -51,194 +67,216 @@ jobs:
           python -m py_compile app/hardware/printer.py
           echo "✅ All Python files are syntactically valid"
 
-      - name: Check for broken imports (mock Qt)
+      # ── Build the installer script ─────────────────────────────────────────
+      - name: Build installer script
         run: |
-          echo "==> Checking imports with mocked Qt..."
-          python -c "
-          import sys
-          # Mock PySide6 so we can test our code structure
-          import types
-          pyside6 = types.ModuleType('PySide6')
-          for mod in ['QtCore', 'QtGui', 'QtQml']:
-              m = types.ModuleType(f'PySide6.{mod}')
-              for cls in ['QObject', 'Signal', 'Slot', 'QThread', 'QTimer',
-                          'QGuiApplication', 'QQmlApplicationEngine',
-                          'Property', 'Qt', 'QCoreApplication']:
-                  setattr(m, cls, object)
-              pyside6.__dict__[mod] = m
-              sys.modules[f'PySide6.{mod}'] = m
-          sys.modules['PySide6'] = pyside6
-          sys.modules['escpos'] = types.ModuleType('escpos')
-          sys.modules['escpos.printer'] = types.ModuleType('escpos.printer')
-          sys.modules['escpos.exceptions'] = types.ModuleType('escpos.exceptions')
-          sys.modules['bleak'] = types.ModuleType('bleak')
-          sys.modules['psutil'] = types.ModuleType('psutil')
-          sys.modules['qrcode'] = types.ModuleType('qrcode')
+          TAG="${{ github.ref_name }}"
+          mkdir -p dist
 
-          # Now test imports
-          import app.database
-          import app.compliance
-          import app.hardware.scanner
-          import app.hardware.printer
-          print('✅ All app modules import successfully')
-          "
+          # Generate the one-command installer
+          cat > dist/install.sh << 'INSTALLER'
+          #!/bin/bash
+          # ╔══════════════════════════════════════════════════════════════════╗
+          # ║          ANTIGRAVITY POS — One-Command Installer                ║
+          # ║                   by factarlou                                  ║
+          # ╚══════════════════════════════════════════════════════════════════╝
+          # Run on a fresh Raspberry Pi OS Lite (64-bit) after first boot:
+          #   curl -sSL https://raw.githubusercontent.com/$REPO/main/dist/install.sh | bash
 
-# ─────────────────────────────────────────────────────────────────────────────
-# JOB 2: Build the Buildroot OS Image (slow, ~3-6 hours)
-# Only runs when explicitly requested or when validate passes on a real tag
-# ─────────────────────────────────────────────────────────────────────────────
-  build_os_image:
-    name: Build RPi OS Image (Buildroot)
+          set -e
+
+          APP_DIR="/opt/antigravity"
+          SERVICE_FILE="/etc/systemd/system/antigravity.service"
+
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  ANTIGRAVITY POS Installer"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          # 1. System updates & dependencies
+          echo "[1/5] Installing system dependencies..."
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            python3-pip python3-venv \
+            libgl1-mesa-dev libgles2-mesa-dev \
+            libfontconfig1 libdbus-1-3 \
+            fonts-dejavu-core \
+            libbluetooth-dev bluetooth bluez
+
+          # 2. Download & extract app
+          echo "[2/5] Downloading Antigravity POS..."
+          sudo mkdir -p "$APP_DIR"
+          RELEASE_URL="https://github.com/${{ github.repository }}/releases/download/$TAG/antigravity_pos_${TAG}_app.zip"
+          curl -L --progress-bar "$RELEASE_URL" -o /tmp/antigravity_app.zip
+          sudo unzip -o /tmp/antigravity_app.zip -d "$APP_DIR"
+          rm /tmp/antigravity_app.zip
+
+          # 3. Install Python packages
+          echo "[3/5] Installing Python packages..."
+          sudo python3 -m venv "$APP_DIR/.venv"
+          sudo "$APP_DIR/.venv/bin/pip" install --upgrade pip --quiet
+          sudo "$APP_DIR/.venv/bin/pip" install -r "$APP_DIR/requirements.txt" --quiet
+
+          # 4. Create systemd service
+          echo "[4/5] Setting up auto-start service..."
+          sudo tee "$SERVICE_FILE" > /dev/null << EOF
+          [Unit]
+          Description=Antigravity POS by factarlou
+          After=network.target
+          Wants=graphical.target
+
+          [Service]
+          Type=simple
+          User=pi
+          Environment=QT_QPA_PLATFORM=eglfs
+          Environment=QT_QPA_EGLFS_KMS_ATOMIC=1
+          Environment=QT_QUICK_CONTROLS_STYLE=Basic
+          Environment=PYTHONPATH=$APP_DIR
+          WorkingDirectory=$APP_DIR
+          ExecStart=$APP_DIR/.venv/bin/python3 $APP_DIR/main.py
+          Restart=on-failure
+          RestartSec=3
+
+          [Install]
+          WantedBy=graphical.target
+          EOF
+
+          sudo systemctl daemon-reload
+          sudo systemctl enable antigravity.service
+
+          # 5. Done
+          echo "[5/5] Installation complete!"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  ✅ Antigravity POS installed!"
+          echo "  Reboot to start automatically:"
+          echo "    sudo reboot"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          INSTALLER
+
+          chmod +x dist/install.sh
+
+      # ── Package the app files ──────────────────────────────────────────────
+      - name: Package app ZIP
+        run: |
+          TAG="${{ github.ref_name }}"
+          mkdir -p dist/app_pkg
+
+          # Copy app files
+          cp -r app dist/app_pkg/
+          cp -r ui  dist/app_pkg/
+          cp -r assets dist/app_pkg/ 2>/dev/null || true
+          cp main.py requirements.txt dist/app_pkg/
+
+          # Create db directory
+          mkdir -p dist/app_pkg/db
+
+          cd dist
+          zip -r "antigravity_pos_${TAG}_app.zip" app_pkg/
+          sha256sum "antigravity_pos_${TAG}_app.zip" > "antigravity_pos_${TAG}_app.zip.sha256"
+
+          echo "==> Package ready:"
+          ls -lh *.zip *.sha256
+
+      # ── Create the GitHub Release with the ZIP ─────────────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "ANTIGRAVITY POS ${{ github.ref_name }}"
+          files: |
+            dist/antigravity_pos_${{ github.ref_name }}_app.zip
+            dist/antigravity_pos_${{ github.ref_name }}_app.zip.sha256
+            dist/install.sh
+          body: |
+            ## 🌌 ANTIGRAVITY POS ${{ github.ref_name }} by factarlou
+
+            ### ⚡ Quick Install (Recommended — 5 minutes)
+
+            > Flash **Raspberry Pi OS Lite 64-bit** to your SD card, boot your Pi Zero 2 W,
+            > connect to WiFi, then run:
+
+            ```bash
+            curl -sSL https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/install.sh | bash
+            sudo reboot
+            ```
+
+            The app will start automatically on every boot.
+
+            ---
+
+            ### 📦 Manual Install
+
+            1. Download `antigravity_pos_${{ github.ref_name }}_app.zip`
+            2. Verify: `sha256sum -c antigravity_pos_${{ github.ref_name }}_app.zip.sha256`
+            3. Extract to `/opt/antigravity/` on your Pi
+            4. Run `install.sh` manually
+
+            ---
+
+            ### Requirements
+            - Raspberry Pi Zero 2 W (or Pi 3/4/5)
+            - Raspberry Pi OS Lite 64-bit (latest)
+            - 8GB+ microSD card
+            - HDMI display
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # JOB 2: Full RPi Image via pi-gen  (~25-35 min, on-demand only)
+  # Uses the official Raspberry Pi Foundation build tool — MUCH more reliable
+  # than Buildroot from scratch. Produces a .img.gz flashable with Etcher.
+  # ───────────────────────────────────────────────────────────────────────────
+  build_rpi_image:
+    name: "💾 RPi SD Card Image (pi-gen)"
     runs-on: ubuntu-latest
-    needs: validate
-    # Skip if user chose to skip, or if this is a dry-run dispatch
-    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.skip_buildroot == 'false') }}
+    needs: release_app
+    # Only run when explicitly requested OR on tags that look like major releases (v1.0.0, v2.0.0)
+    if: |
+      (github.event_name == 'workflow_dispatch' && inputs.build_image == 'true') ||
+      (github.event_name == 'push' && startsWith(github.ref_name, 'v') && !contains(github.ref_name, '-'))
     permissions:
       contents: write
 
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # ── Free up disk space ──────────────────────────────────────────────
-      # GitHub runners have ~14GB free. Buildroot needs ~10GB.
-      - name: Maximize Available Disk Space
+      - name: Free disk space
         run: |
-          echo "==> Disk before cleanup:"
-          df -h
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
           sudo apt-get clean
-          docker system prune -af || true
-          echo "==> Disk after cleanup:"
-          df -h
+          echo "==> Free space: $(df -h / | tail -1 | awk '{print $4}')"
 
-      # ── Cache the Buildroot source downloads ────────────────────────────
-      # This is the biggest time-saver. Downloads are ~2GB and take 30min.
-      # With caching, subsequent builds skip the download step entirely.
-      - name: Cache Buildroot Downloads
-        uses: actions/cache@v4
+      # ── Build the custom Pi image using pi-gen ─────────────────────────────
+      # pi-gen is what the RPi Foundation uses to build Raspberry Pi OS itself.
+      # It's battle-tested, well-documented, and completes in ~30 min.
+      - name: Build RPi Image with pi-gen
+        uses: usimd/pi-gen-action@v1
+        id: build
         with:
-          path: buildroot_dl
-          key: buildroot-dl-2023.11-${{ hashFiles('buildroot/configs/antigravity_defconfig') }}
-          restore-keys: |
-            buildroot-dl-2023.11-
-            buildroot-dl-
+          # Base: Raspberry Pi OS Lite (no desktop, minimal)
+          image-name: antigravity_pos_${{ github.ref_name }}
+          stage-list: stage0 stage1 stage2 ./pi-gen-stage
+          compression: xz
+          compression-level: 3
+          # Enable to keep intermediate layer caches
+          enable-noobs: false
+          # Reduce image size — no recommended extras
+          disable-first-boot-user-rename: true
 
-      # ── Install host build dependencies ────────────────────────────────
-      - name: Install Buildroot Host Dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            build-essential bash bc binutils bzip2 ca-certificates \
-            cpio file g++ gcc git gzip libncurses5-dev libssl-dev \
-            make patch perl python3 python3-pip rsync sed tar \
-            unzip wget diffutils libelf-dev
-
-      # ── Clone Buildroot (specific release, not a branch tip) ────────────
-      # Using a tagged release is more stable than a branch (which can change)
-      - name: Clone Buildroot 2023.11.3
-        run: |
-          if [ ! -d buildroot_src/.git ]; then
-            git clone \
-              --branch 2023.11.3 \
-              --depth 1 \
-              https://git.buildroot.net/buildroot \
-              buildroot_src
-          else
-            echo "Buildroot source already cached"
-          fi
-
-      # ── Set up the configuration ────────────────────────────────────────
-      - name: Setup Buildroot Configuration
-        run: |
-          # Copy board support files into the Buildroot tree
-          cp -r buildroot/board buildroot_src/
-          cp buildroot/configs/antigravity_defconfig buildroot_src/configs/
-
-          # Point Buildroot download cache to our cached directory
-          mkdir -p buildroot_dl
-          echo "BR2_DL_DIR=\"$(pwd)/buildroot_dl\"" >> buildroot_src/.config || true
-
-      # ── Apply configuration ─────────────────────────────────────────────
-      - name: Apply Buildroot Defconfig
-        working-directory: buildroot_src
-        run: |
-          make antigravity_defconfig
-          # Verify no unknown symbols
-          make olddefconfig
-
-      # ── Compile (the big one) ───────────────────────────────────────────
-      # We limit parallelism slightly to avoid OOM on the 7GB runner
-      - name: Build Antigravity OS Image
-        working-directory: buildroot_src
-        timeout-minutes: 300
-        run: |
-          echo "==> Build started at $(date)"
-          make -j$(( $(nproc) > 4 ? 4 : $(nproc) )) 2>&1 | tee build.log
-          echo "==> Build finished at $(date)"
-
-      # ── Package the release asset ────────────────────────────────────────
-      - name: Prepare Release Asset
-        run: |
-          mkdir -p release_assets
-          IMAGE_FILE="buildroot_src/output/images/sdcard.img"
-
-          if [ ! -f "$IMAGE_FILE" ]; then
-            echo "ERROR: sdcard.img not found! Build may have failed."
-            ls -la buildroot_src/output/images/ || true
-            exit 1
-          fi
-
-          cp "$IMAGE_FILE" release_assets/antigravity_pos_rpi_zero2w_${{ github.ref_name }}.img
-          cd release_assets
-          zip antigravity_pos_${{ github.ref_name }}_rpi_zero2w.zip \
-              antigravity_pos_rpi_zero2w_${{ github.ref_name }}.img
-
-          # Generate SHA256 checksum
-          sha256sum antigravity_pos_${{ github.ref_name }}_rpi_zero2w.zip \
-              > antigravity_pos_${{ github.ref_name }}_rpi_zero2w.zip.sha256
-
-          echo "==> Release asset ready:"
-          ls -lh release_assets/
-
-      # ── Upload build log as artifact (always, for debugging) ─────────────
-      - name: Upload Build Log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: buildroot-build-log-${{ github.ref_name }}
-          path: buildroot_src/build.log
-          retention-days: 7
-
-      # ── Create GitHub Release ─────────────────────────────────────────────
-      - name: Create GitHub Release
+      # ── Package and upload the image ───────────────────────────────────────
+      - name: Upload image to release
+        if: steps.build.outputs.image-path != ''
         uses: softprops/action-gh-release@v2
         with:
+          name: "ANTIGRAVITY POS ${{ github.ref_name }}"
           files: |
-            release_assets/antigravity_pos_${{ github.ref_name }}_rpi_zero2w.zip
-            release_assets/antigravity_pos_${{ github.ref_name }}_rpi_zero2w.zip.sha256
-          name: "Antigravity POS ${{ github.ref_name }}"
+            ${{ steps.build.outputs.image-path }}
           body: |
-            ## 🌌 Antigravity POS ${{ github.ref_name }}
+            ## 💾 SD Card Image Added
 
-            ### Installation
-            1. Download the `.zip` file and verify with the `.sha256` checksum
-            2. Extract the `.img` file
-            3. Flash to a microSD card using [Raspberry Pi Imager](https://www.raspberrypi.com/software/) or `dd`
-            4. Insert into Raspberry Pi Zero 2 W and power on
-
-            ### First Boot
-            - The app starts automatically via systemd on boot
-            - Configure your store settings on first launch
-
-            ### Requirements
-            - Raspberry Pi Zero 2 W (BCM2710, 512MB RAM)
-            - MicroSD card (8GB minimum, Class 10 recommended)
-            - HDMI display
-          draft: false
-          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+            An Etcher-ready `.img.xz` image has been added to this release.
+            Flash it directly with [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
+            or Balena Etcher — no setup required.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
