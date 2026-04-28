@@ -255,7 +255,7 @@ jobs:
         with:
           # Base: Raspberry Pi OS Lite (no desktop, minimal)
           image-name: antigravity_pos_${{ github.ref_name }}
-          stage-list: stage0 stage1 stage2 ./pi-gen-stage
+          stage-list: stage0 stage1 stage2 pi-gen-stage
           compression: xz
           compression-level: 3
           # Enable to keep intermediate layer caches
