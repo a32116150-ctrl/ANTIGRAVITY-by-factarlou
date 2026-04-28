@@ -40,7 +40,7 @@ jobs:
   # ───────────────────────────────────────────────────────────────────────────
   release_app:
     name: "📦 App Installer Release"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     permissions:
       contents: write
 
@@ -227,7 +227,7 @@ jobs:
   # ───────────────────────────────────────────────────────────────────────────
   build_rpi_image:
     name: "💾 RPi SD Card Image (pi-gen)"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: release_app
     # Only run when explicitly requested OR on tags that look like major releases (v1.0.0, v2.0.0)
     if: |
