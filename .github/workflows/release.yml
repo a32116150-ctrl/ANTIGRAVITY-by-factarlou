@@ -168,8 +168,9 @@ jobs:
           # Create db directory
           mkdir -p dist/app_pkg/db
 
-          cd dist
-          zip -r "antigravity_pos_${TAG}_app.zip" app_pkg/
+          cd dist/app_pkg
+          zip -r "../antigravity_pos_${TAG}_app.zip" .
+          cd ..
           sha256sum "antigravity_pos_${TAG}_app.zip" > "antigravity_pos_${TAG}_app.zip.sha256"
 
           echo "==> Package ready:"
@@ -251,7 +252,7 @@ jobs:
 
       - name: Inject GitHub Tag into script
         run: |
-          sed -i "s/THE_GITHUB_TAG/${{ github.ref_name }}/g" pi-gen-stage/00-install-antigravity/00-run.sh
+          sed -i "s/THE_GITHUB_TAG/${{ github.ref_name }}/g" pi-gen-stage/00-install-antigravity/01-run.sh
 
       # ── Build the custom Pi image using pi-gen ─────────────────────────────
       # pi-gen is what the RPi Foundation uses to build Raspberry Pi OS itself.
