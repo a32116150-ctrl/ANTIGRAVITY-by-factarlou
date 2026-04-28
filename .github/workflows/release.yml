@@ -246,6 +246,13 @@ jobs:
           sudo apt-get clean
           echo "==> Free space: $(df -h / | tail -1 | awk '{print $4}')"
 
+      - name: Set up QEMU for ARM emulation
+        uses: docker/setup-qemu-action@v3
+
+      - name: Inject GitHub Tag into script
+        run: |
+          sed -i "s/THE_GITHUB_TAG/${{ github.ref_name }}/g" pi-gen-stage/00-install-antigravity/00-run.sh
+
       # ── Build the custom Pi image using pi-gen ─────────────────────────────
       # pi-gen is what the RPi Foundation uses to build Raspberry Pi OS itself.
       # It's battle-tested, well-documented, and completes in ~30 min.
