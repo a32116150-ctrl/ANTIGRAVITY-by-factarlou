@@ -264,6 +264,7 @@ jobs:
           # Use the arm64 branch to build a 64-bit image (required for PySide6)
           pi-gen-version: 'arm64'
           # Base: Raspberry Pi OS Lite (no desktop, minimal)
+          release: 'bookworm'
           image-name: antigravity_pos_${{ github.ref_name }}
           stage-list: stage0 stage1 stage2 pi-gen-stage
           compression: xz
