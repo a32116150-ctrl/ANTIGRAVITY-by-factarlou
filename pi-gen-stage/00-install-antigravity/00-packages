@@ -1,5 +1,6 @@
 python3-pip
 python3-venv
+python3-dev
 libgl1-mesa-dev
 libgles2-mesa-dev
 libfontconfig1
@@ -8,3 +9,19 @@ fonts-dejavu-core
 libbluetooth-dev
 bluetooth
 bluez
+libxkbcommon0
+libegl1
+libgles2
+libasound2
+libmtdev1
+libinput10
+libxkbcommon-x11-0
+libxcb-cursor0
+libxcb-icccm4
+libxcb-image0
+libxcb-keysyms1
+libxcb-render-util0
+libxcb-shape0
+libxcb-xinerama0
+libxcb-xkb1
+unzip

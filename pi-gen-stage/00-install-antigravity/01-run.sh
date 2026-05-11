@@ -7,7 +7,8 @@ mkdir -p "${APP_DIR}"
 TAG="THE_GITHUB_TAG"
 REPO="a32116150-ctrl/ANTIGRAVITY-by-factarlou"
 
-echo "Downloading release ${TAG} from ${REPO}..."
-curl -L --fail "https://github.com/${REPO}/releases/download/${TAG}/antigravity_pos_${TAG}_app.zip" -o "${ROOTFS_DIR}/tmp/app.zip"
-
+echo "Copying app files into rootfs..."
+cp -r files/* "${APP_DIR}/"
+mkdir -p "${APP_DIR}/db"
+chmod -R 755 "${APP_DIR}"
 

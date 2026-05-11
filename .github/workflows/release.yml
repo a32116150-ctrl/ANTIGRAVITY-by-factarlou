@@ -250,8 +250,11 @@ jobs:
       - name: Set up QEMU for ARM emulation
         uses: docker/setup-qemu-action@v3
 
-      - name: Inject GitHub Tag into script
+      - name: Prepare app files for pi-gen
         run: |
+          mkdir -p pi-gen-stage/00-install-antigravity/files
+          cp -r app ui assets main.py requirements.txt pi-gen-stage/00-install-antigravity/files/
+          # Ensure the tag is correctly set in the run script if still needed for metadata
           sed -i "s/THE_GITHUB_TAG/${{ github.ref_name }}/g" pi-gen-stage/00-install-antigravity/01-run.sh
 
       # ── Build the custom Pi image using pi-gen ─────────────────────────────

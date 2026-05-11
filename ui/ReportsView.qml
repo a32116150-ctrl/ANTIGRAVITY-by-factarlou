@@ -101,7 +101,8 @@ Rectangle {
                         }
 
                         Text {
-                            id: modelData.id === "rev" ? revText : (modelData.id === "txn" ? txnText : vatText)
+                            // id: modelData.id === "rev" ? revText : (modelData.id === "txn" ? txnText : vatText) // Invalid QML: id must be a literal
+                            id: valueDisplay
                             Layout.alignment: Qt.AlignHCenter
                             text: {
                                 var val = posBackend && posBackend.dailySummary
