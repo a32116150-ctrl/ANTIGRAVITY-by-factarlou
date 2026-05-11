@@ -265,9 +265,6 @@ jobs:
           mkdir -p pi-gen-stage/00-install-antigravity/files
           cp -r app ui main.py requirements.txt pi-gen-stage/00-install-antigravity/files/
           cp -r assets pi-gen-stage/00-install-antigravity/files/ 2>/dev/null || true
-          # Ensure the tag is correctly set in the run script if still needed for metadata
-
-          sed -i "s/THE_GITHUB_TAG/${{ github.ref_name }}/g" pi-gen-stage/00-install-antigravity/01-run.sh
 
       # ── Build the custom Pi image using pi-gen ─────────────────────────────
       # pi-gen is what the RPi Foundation uses to build Raspberry Pi OS itself.
