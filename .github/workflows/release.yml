@@ -250,6 +250,12 @@ jobs:
       - name: Set up QEMU for ARM emulation
         uses: docker/setup-qemu-action@v3
 
+      - name: Update host keyring
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y debian-archive-keyring
+
+
       - name: Prepare app files for pi-gen
         run: |
           mkdir -p pi-gen-stage/00-install-antigravity/files
@@ -266,8 +272,9 @@ jobs:
         uses: usimd/pi-gen-action@v1
         id: build
         with:
-          # Use the arm64 branch to build a 64-bit image (required for PySide6)
-          pi-gen-version: 'arm64'
+          # Use the master branch for up-to-date keys and Bookworm support
+          pi-gen-version: 'master'
+
           # Base: Raspberry Pi OS Lite (no desktop, minimal)
           release: 'bookworm'
           image-name: antigravity_pos_${{ github.ref_name }}
