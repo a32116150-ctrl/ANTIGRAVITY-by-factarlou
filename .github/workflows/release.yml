@@ -253,9 +253,12 @@ jobs:
       - name: Update host keyring
         run: |
           sudo apt-get update
-          sudo apt-get install -y debian-archive-keyring
-
-
+          sudo apt-get install -y debian-archive-keyring gpg
+          # Ensure Bookworm keys are available for debootstrap
+          sudo mkdir -p /usr/share/keyrings
+          if [ -f /usr/share/keyrings/debian-archive-keyring.gpg ]; then
+            sudo cp /usr/share/keyrings/debian-archive-keyring.gpg /usr/share/keyrings/debian-archive-bookworm.gpg
+          fi
       - name: Prepare app files for pi-gen
         run: |
           mkdir -p pi-gen-stage/00-install-antigravity/files
@@ -272,8 +275,9 @@ jobs:
         uses: usimd/pi-gen-action@v1
         id: build
         with:
-          # Use the master branch for up-to-date keys and Bookworm support
-          pi-gen-version: 'master'
+          # Use the arm64 branch which is proven to work with this action's Docker environment
+          pi-gen-version: 'arm64'
+
 
           # Base: Raspberry Pi OS Lite (no desktop, minimal)
           release: 'bookworm'
