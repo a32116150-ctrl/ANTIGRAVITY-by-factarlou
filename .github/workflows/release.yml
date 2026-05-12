@@ -275,8 +275,8 @@ jobs:
         uses: usimd/pi-gen-action@v1
         id: build
         with:
-          # master branch tracks current RPi OS Bookworm and has updated keyrings
-          pi-gen-version: 'master'
+          # Using a specific stable tag for RPi OS Bookworm
+          pi-gen-version: '2024-11-19-raspios-bookworm'
 
 
           # Base: Raspberry Pi OS Lite (no desktop, minimal)
