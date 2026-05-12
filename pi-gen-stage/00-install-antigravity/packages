@@ -25,3 +25,5 @@ libxcb-shape0
 libxcb-xinerama0
 libxcb-xkb1
 unzip
+libjpeg-dev
+zlib1g-dev

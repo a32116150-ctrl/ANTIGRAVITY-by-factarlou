@@ -35,6 +35,14 @@ echo "Setting up Python virtual environment in chroot..."
 on_chroot << 'CHROOT'
     APP_DIR="/opt/antigravity"
 
+    # Create pi user if it doesn't exist (Bookworm Lite default)
+    if ! id "pi" &>/dev/null; then
+        echo "Creating 'pi' user..."
+        useradd -m -s /bin/bash pi
+        echo "pi:raspberry" | chpasswd
+        usermod -aG sudo,video,audio,input,bluetooth pi
+    fi
+
     chown -R pi:pi "${APP_DIR}"
 
     python3 -m venv "${APP_DIR}/.venv"
