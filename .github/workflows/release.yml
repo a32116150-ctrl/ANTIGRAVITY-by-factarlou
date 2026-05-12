@@ -262,12 +262,6 @@ jobs:
           sudo gpg --export 6ED0E7B82643E131 78DBA3BC47EF2265 F8D2585B8783D481 \
             54404762BBB6E853 BDE6D2B9216EC7A8 \
             | sudo tee /usr/share/keyrings/debian-bookworm-extra.gpg > /dev/null
-      - name: Prepare app files for pi-gen
-        run: |
-          mkdir -p pi-gen-stage/00-install-antigravity/files
-          cp -r app ui main.py requirements.txt pi-gen-stage/00-install-antigravity/files/
-          cp -r assets pi-gen-stage/00-install-antigravity/files/ 2>/dev/null || true
-
       # ── Build the custom Pi image using pi-gen ─────────────────────────────
       # pi-gen is what the RPi Foundation uses to build Raspberry Pi OS itself.
       # It's battle-tested, well-documented, and completes in ~30 min.
