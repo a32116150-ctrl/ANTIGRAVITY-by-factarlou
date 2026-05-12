@@ -5,7 +5,11 @@ APP_DIR="${ROOTFS_DIR}/opt/antigravity"
 echo "Copying app files into rootfs using FILESDIR..."
 mkdir -p "${APP_DIR}"
 # Use official FILESDIR variable for robustness
-cp -r "${FILESDIR}"/* "${APP_DIR}/"
+# Copy each item explicitly to avoid accidental recursion with Buildroot/pi-gen folders
+cp -r "${FILESDIR}"/app "${APP_DIR}/"
+cp -r "${FILESDIR}"/ui "${APP_DIR}/"
+cp "${FILESDIR}"/main.py "${APP_DIR}/"
+cp "${FILESDIR}"/requirements.txt "${APP_DIR}/"
 mkdir -p "${APP_DIR}/db"
 
 echo "Writing systemd service file..."

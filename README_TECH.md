@@ -67,5 +67,24 @@ Since physical ESC/POS printers and `evdev` scanners are Linux-only, the macOS v
 - **Category Management**: Categories are handled as unique entities. Adding a category automatically updates the filter bars in both Sales and Inventory views.
 - **Low Stock Alerts**: Managed via `low_stock_threshold`. Items below this level turn **Neon Magenta** automatically.
 
+---
+
+## 🚀 Release & Deployment (CI/CD)
+
+The project uses a high-performance **GitHub Actions** pipeline to produce production-ready OS images.
+
+### 1. App Installer (ZIP)
+Generates a lightweight ZIP containing the app source and a one-click `install.sh` for users running a stock Raspberry Pi OS.
+
+### 2. Full OS Image (pi-gen)
+Compiles a custom, bootable **Raspberry Pi OS Lite (64-bit)** image.
+- **Build Engine**: `pi-gen` (official RPi Foundation build tool).
+- **Runner**: Ubuntu 22.04 (optimized for QEMU/Docker stability).
+- **Custom Stage**: The `pi-gen-stage` folder integrates the app directly into `/opt/antigravity`, pre-configures the `pi` user, and sets up the `antigravity.service` for instant boot-to-app behavior.
+- **Reliability**: Features a multi-stage GPG keyring fix to ensure Debian Bookworm archives are correctly validated during headless builds.
+
+> [!NOTE]
+> Deployment images are optimized for **Raspberry Pi Zero 2 W** but compatible with Pi 3, 4, and 5.
+
 > [!NOTE]
 > This system is optimized for **800x480** (Raspberry Pi Official Touch) but scales perfectly up to **1024x768** and beyond due to its flexible grid architecture.

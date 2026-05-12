@@ -103,9 +103,21 @@ The project uses **GitHub Actions** to automate the creation of hardware images:
 * **Reports View**: Fully implemented. Now displays a robust 100-invoice history table (ID, Date, VAT, Total), live today's stats, and buttons for Z-Report & Refresh.
 * **Branding**: App is strictly branded as `ANTIGRAVITY by factarlou`.
 
-### **CI/CD Architecture Rewrite**
+### **CI/CD Architecture Rewrite (v2.0.x)**
 The legacy `Buildroot` workflow (which caused 6-hour OOM failures) has been completely replaced by a robust two-stage pipeline:
 1. **Job 1: App Installer Zip (~2 mins)**: Validates Python syntax and builds an app zip + a 1-click `install.sh` for folks flashing a stock Pi image.
 2. **Job 2: RPi OS Image Builder (~30 mins)**: Uses the official `usimd/pi-gen-action` to compile the app directly into a bootable Debian OS `.img.xz` file.
-   * *Critical Bug Fix (`v1.2.3 / v1.2.4`)*: GitHub Actions' `ubuntu-latest` (Ubuntu 24.04) has broken AppArmor `qemu-user-static` profiles. This was causing instant (45-second) Docker crashes. **Fix:** Downgraded the GitHub runner to `ubuntu-22.04` and explicitly added `docker/setup-qemu-action@v3` to securely register ARM binfmt handlers on the host before running the OS compilation.
-   * *pi-gen Syntax*: Custom stages must be passed strictly as folder names (e.g., `pi-gen-stage` instead of `./pi-gen-stage`), must contain the `EXPORT_IMAGE` marker, and must explicitly receive the GitHub tag via `sed` since Docker isolation drops external environment variables.
+   * *Critical Bug Fix (v2.0.1)*: GitHub Actions' `ubuntu-latest` (Ubuntu 24.04) has broken AppArmor `qemu-user-static` profiles. This was causing instant (45-second) Docker crashes. **Fix:** Downgraded the GitHub runner to `ubuntu-22.04` and explicitly added `docker/setup-qemu-action@v3` to securely register ARM binfmt handlers on the host before running the OS compilation.
+   * *GPG Keyring Fix (v2.0.4)*: Debian Bookworm archives often fail trust validation in headless CI environments. **Fix:** Explicitly imported Bookworm GPG keys (ids: `6ED0E7B82643E131`, etc.) into `/usr/share/keyrings/debian-bookworm-extra.gpg` before the `pi-gen` run.
+   * *Stable pi-gen Tags (v2.0.6)*: Switched from the `arm64` branch to the specific stable tag `2024-07-04-raspios-bookworm-arm64` to ensure build reproducibility and up-to-date Bookworm keyrings.
+   * *pi-gen Structural Optimization*: 
+     * Custom stages are housed in `pi-gen-stage/`.
+     * Stage scripts are named `00-run.sh` for strict execution order.
+     * Used `${FILESDIR}` for robust file copying within the chroot.
+     * **Boot Fix**: Added logic to create the `pi` user (password: `raspberry`) during the build, as Bookworm Lite no longer includes a default user.
+     * **Reliability**: Implemented manual systemd symlinking for the `antigravity.service` to bypass `systemctl enable` issues in non-running chroots.
+
+### **App & Dependency Management**
+* **Python Core**: Upgraded to `PySide6>=6.8.0` for significantly better ARM64 performance and smaller wheel sizes.
+* **System Monitoring**: Integrated `psutil` for proactive memory management on the 512MB Pi Zero 2 W.
+* **Hardware Support**: Fixed `evdev` missing dependency and added `libjpeg-dev` / `zlib1g-dev` to the OS image to support QR code generation via `Pillow`.
